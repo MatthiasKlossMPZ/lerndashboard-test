@@ -1290,7 +1290,7 @@ function exportMatrixPDF() {
         return;
     }
 
-    const doc = new jsPDF('l', 'mm', 'a4'); // landscape
+    const doc = new jsPDF('l', 'mm', 'a4');
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     let y = 25;
@@ -1304,9 +1304,9 @@ function exportMatrixPDF() {
     doc.setFontSize(12);
     doc.setTextColor(100);
     doc.text(`Export: ${new Date().toLocaleDateString('de-DE')}`, pageWidth - 30, y, { align: 'right' });
-    y += 12;
+    y += 15;
 
-    // === DATEN ===
+    // === KONFIG ===
     const competences = [
         "Suchen, Verarbeiten und Aufbewahren",
         "Kommunizieren und Kooperieren",
@@ -1317,35 +1317,34 @@ function exportMatrixPDF() {
     ];
     const levels = ["Niveaustufe 1", "Niveaustufe 2", "Niveaustufe 3", "Niveaustufe 4", "Niveaustufe 5"];
     const levelColors = [
-        [139, 195, 74],  // hellgrün
-        [76, 175, 80],   // grün
-        [255, 193, 7],   // gelb/orange
-        [255, 152, 0],   // orange
-        [244, 67, 54]    // rot
+        [139, 195, 74], [76, 175, 80], [255, 193, 7], [255, 152, 0], [244, 67, 54]
     ];
 
-    const colWidth = (pageWidth - 60) / 5; // 5 Niveaustufen
-    const rowHeight = 18;
+    const colWidth = (pageWidth - 60) / 5;
+    const baseRowHeight = 18;
+    const lineHeight = 4.5;
+    const padding = 3;
     const startX = 15;
-    let startY = y;
+    let currentY = y;
 
     // === HEADER ===
     doc.setFillColor(107, 70, 193);
-    doc.rect(startX, startY, 45, rowHeight, 'F');
+    doc.rect(startX, currentY, 45, baseRowHeight, 'F');
     doc.setTextColor(255);
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text('Kompetenz', startX + 5, startY + 12);
+    doc.text('Kompetenz', startX + 5, currentY + 12);
 
     levels.forEach((level, i) => {
         const x = startX + 45 + i * colWidth;
         doc.setFillColor(...levelColors[i]);
-        doc.rect(x, startY, colWidth, rowHeight, 'F');
+        doc.rect(x, currentY, colWidth, baseRowHeight, 'F');
         doc.setTextColor(255);
-        doc.text(level, x + colWidth / 2, startY + 12, { align: 'center' });
+        doc.text(level, x + colWidth / 2, currentY + 12, { align: 'center' });
     });
+    currentY += baseRowHeight;
 
-    // === MATRIX ===
+    // === DATEN SAMMELN ===
     const matrix = {};
     competences.forEach(c => {
         matrix[c] = {};
@@ -1360,27 +1359,38 @@ function exportMatrixPDF() {
         const tool = r.tool?.trim();
 
         if (comp && level && topic && matrix[comp]?.[level]) {
-            const entry = `Klasse ${grade}\n${topic}\n${tool || '—'}`;
-            matrix[comp][level].push(entry);
+            matrix[comp][level].push(`Klasse ${grade}\n${topic}\n${tool || '—'}`);
         }
     });
 
-    competences.forEach((comp, rowIndex) => {
-        const rowY = startY + (rowIndex + 1) * rowHeight;
-        if (rowY > pageHeight - 30) {
+    // === ZEILEN HÖHE BERECHNEN & ZEICHNEN ===
+    competences.forEach(comp => {
+        let maxLinesInRow = 1;
+
+        levels.forEach(level => {
+            const entries = matrix[comp][level];
+            const linesInCell = entries.reduce((sum, entry) => sum + entry.split('\n').length, 0);
+            const gaps = entries.length > 0 ? entries.length - 1 : 0;
+            maxLinesInRow = Math.max(maxLinesInRow, linesInCell + gaps);
+        });
+
+        const rowHeight = Math.max(baseRowHeight, (maxLinesInRow * lineHeight) + (2 * padding));
+        const cellHeight = rowHeight;
+
+        // Neue Seite?
+        if (currentY + cellHeight > pageHeight - 20) {
             doc.addPage();
-            startY = 25;
-            y = startY + rowHeight;
+            currentY = 25;
         }
 
         // Kompetenz-Zelle
         doc.setFillColor(240, 240, 255);
-        doc.rect(startX, rowY, 45, rowHeight, 'F');
+        doc.rect(startX, currentY, 45, cellHeight, 'F');
         doc.setTextColor(0);
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
         const splitComp = doc.splitTextToSize(comp, 40);
-        doc.text(splitComp, startX + 5, rowY + 8);
+        doc.text(splitComp, startX + 5, currentY + padding + 4);
 
         // Niveaustufen-Zellen
         levels.forEach((level, colIndex) => {
@@ -1389,17 +1399,18 @@ function exportMatrixPDF() {
             const cellText = entries.length > 0 ? entries.join('\n\n') : '—';
 
             doc.setFillColor(255, 255, 255);
-            doc.rect(x, rowY, colWidth, rowHeight, 'F');
+            doc.rect(x, currentY, colWidth, cellHeight, 'F');
             doc.setTextColor(70);
             doc.setFontSize(9);
             doc.setFont('helvetica', 'normal');
 
             const splitText = doc.splitTextToSize(cellText, colWidth - 8);
-            doc.text(splitText, x + 4, rowY + 6);
+            doc.text(splitText, x + 4, currentY + padding + 3);
         });
+
+        currentY += cellHeight;
     });
 
-    // === SPEICHERN ===
     doc.save(`LernDashboard_Matrix_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
  </script>  <!-- ← ENDE SCRIPT -->
