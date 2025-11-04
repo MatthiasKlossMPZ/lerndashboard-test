@@ -1015,7 +1015,7 @@ function deleteResource(i) {
                     favorite: false,
                     lastModified: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
                 };
-                const duplicate = resources.some(r => r.topic === newRes.topic && r.subject === newRes.subject && r.grade === newRes.grade);
+                const duplicate = resources.some(r => r.topic === newRes.topic && r.subject === newRes.subject && r.grade === newRes.grade && (r.level || '') === (newRes.level || ''));
                 if (duplicate) {
                     skipped++;
                     log.innerHTML += `<div style="color:#e67e22;">Übersprungen: Duplikat "${newRes.topic}"</div>`;
@@ -1224,10 +1224,6 @@ if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.p
 }
 function exportMatrixCSV() {
     const filtered = getFilteredResources();
-
-    // DEBUG: Was ist drin?
-    console.log("Gefilterte Ressourcen:", filtered.length, filtered);
-
     if (filtered.length === 0) {
         showAlert("Keine passenden Ressourcen für die Matrix!\nTipp: Filter zurücksetzen oder Daten prüfen.");
         return;
@@ -1241,42 +1237,48 @@ function exportMatrixCSV() {
         "Problemlösen und Handeln",
         "Analysieren und Reflektieren"
     ];
-
     const levels = ["Niveaustufe 1", "Niveaustufe 2", "Niveaustufe 3", "Niveaustufe 4", "Niveaustufe 5"];
 
+    // Matrix: competence -> level -> Set von "Thema (Klasse – Tool)"
     const matrix = {};
     competences.forEach(c => {
         matrix[c] = {};
-        levels.forEach(l => matrix[c][l] = []);
+        levels.forEach(l => matrix[c][l] = new Set());
     });
 
+    // Daten eintragen
     filtered.forEach(r => {
-        const c = r.competence?.trim();
-        const l = r.level?.trim();
+        const comp = r.competence?.trim();
+        const level = r.level?.trim();
         const topic = r.topic?.trim();
+        const grade = r.grade?.trim();
+        const tool = r.tool?.trim();
 
-        if (c && l && topic && matrix[c] && matrix[c][l]) {
-            matrix[c][l].push(topic);
+        if (comp && level && topic && matrix[comp]?.[level]) {
+            const entry = `${topic} (${grade}${tool ? ` – ${tool}` : ''})`;
+            matrix[comp][level].add(entry);
         }
     });
 
-    // CSV
-    let csv = '\uFEFFKompetenz;' + levels.join(';') + '\n';
+    // CSV generieren
+    let csv = '\uFEFF'; // UTF-8 BOM
+    csv += '"Kompetenz";' + levels.map(l => `"${l}"`).join(';') + '\n';
 
-    competences.forEach(c => {
-        let row = `"${c}"`;
-        levels.forEach(l => {
-            const topics = matrix[c][l];
-            const cell = topics.length > 0 ? topics.join(', ') : '—';
-            row += `;"${cell}"`;
+    competences.forEach(comp => {
+        let row = [`"${comp}"`];
+        levels.forEach(level => {
+            const entries = [...matrix[comp][level]];
+            const cell = entries.length > 0 ? entries.join('\n') : '—';
+            row.push(`"${cell}"`);
         });
-        csv += row + '\n';
+        csv += row.join(';') + '\n';
     });
 
+    // Download
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `LernDashboard_Matrix_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `LernDashboard_Matrix_Detail_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
 }
  </script>  <!-- ← ENDE SCRIPT -->
