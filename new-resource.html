@@ -239,6 +239,17 @@
                 </select>
             </div>
             <div class="form-group">
+                <label for="level" class="required">Niveau-Stufe</label>
+                <select id="level" required>
+                    <option value="">– Stufe wählen –</option>
+                    <option value="Level 1 (Einstieg)">Level 1 (Einstieg)</option>
+                    <option value="Level 2 (Grundlagen)">Level 2 (Grundlagen)</option>
+                    <option value="Level 3 (Fortgeschritten)">Level 3 (Fortgeschritten)</option>
+                    <option value="Level 4 (Experte)">Level 4 (Experte)</option>
+                    <option value="Level 5 (Meister)">Level 5 (Meister)</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label for="tool">Digitales Tool</label>
                 <input type="text" id="tool" placeholder="z.B. GeoGebra, Canva, Padlet">
             </div>
@@ -274,9 +285,10 @@ function cancel() {
     const subject = document.getElementById('subject').value;
     const grade = document.getElementById('grade').value;
     const competence = document.getElementById('competence').value;
+    const level = document.getElementById('level').value;
 
     // Mindestens ein Pflichtfeld gefüllt?
-    const hasInput = topic || (subject && subject !== "") || (grade && grade !== "") || (competence && competence !== "");
+    const hasInput = topic || (subject && subject !== "") || (grade && grade !== "") || (competence && competence !== "") || (level && level !== "");
 
     if (hasInput && !confirm('Möchtest du wirklich abbrechen? Deine Eingaben gehen verloren.')) {
         return; // Abbrechen verhindern
@@ -295,13 +307,14 @@ function cancel() {
                 subject: document.getElementById('subject').value,
                 grade: document.getElementById('grade').value,
                 competence: document.getElementById('competence').value,
+                level: document.getElementById('level').value,  // Neues Feld
                 tool: document.getElementById('tool').value.trim(),
                 description: document.getElementById('description').value.trim(),
                 favorite: false,
                 lastModified: new Date().toLocaleDateString('de-DE')
             };
 
-            if (!resource.topic || !resource.subject || !resource.grade || !resource.competence) {
+            if (!resource.topic || !resource.subject || !resource.grade || !resource.competence || !resource.level) {
                 alert('Bitte alle Pflichtfelder ausfüllen!');
                 return;
             }

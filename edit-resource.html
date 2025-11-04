@@ -27,6 +27,7 @@
             <div class="form-group"><label>Fach *</label><select id="editSubject" required></select></div>
             <div class="form-group"><label>Klasse *</label><select id="editGrade" required></select></div>
             <div class="form-group"><label>Kompetenz *</label><select id="editCompetence" required></select></div>
+            <div class="form-group"><label>Niveau-Stufe *</label><select id="editLevel" required></select></div>  <!-- Neues Feld -->
             <div class="form-group"><label>Tool</label><input type="text" id="editTool"></div>
             <div class="form-group"><label>Beschreibung</label><textarea id="editDescription"></textarea></div>
             <div class="buttons">
@@ -51,6 +52,13 @@
             "Problemlösen und Handeln",
             "Analysieren und Reflektieren"
         ];
+        const levels = [
+            "Level 1 (Einstieg)",
+            "Level 2 (Grundlagen)",
+            "Level 3 (Fortgeschritten)",
+            "Level 4 (Experte)",
+            "Level 5 (Meister)"
+        ];
 
         function populate(selectId, options) {
             const s = document.getElementById(selectId);
@@ -60,12 +68,14 @@
         populate('editSubject', subjects);
         populate('editGrade', grades);
         populate('editCompetence', competences);
+        populate('editLevel', levels);  // Neues Feld befüllen
 
         if (data) {
             document.getElementById('editTopic').value = data.topic || '';
             document.getElementById('editSubject').value = data.subject || '';
             document.getElementById('editGrade').value = data.grade || '';
             document.getElementById('editCompetence').value = data.competence || '';
+            document.getElementById('editLevel').value = data.level || '';  // Neues Feld
             document.getElementById('editTool').value = data.tool || '';
             document.getElementById('editDescription').value = data.description || '';
         }
@@ -77,6 +87,7 @@
                 subject: document.getElementById('editSubject').value,
                 grade: document.getElementById('editGrade').value,
                 competence: document.getElementById('editCompetence').value,
+                level: document.getElementById('editLevel').value,  // Neues Feld
                 tool: document.getElementById('editTool').value.trim(),
                 description: document.getElementById('editDescription').value.trim(),
                 favorite: data.favorite || false,
