@@ -479,24 +479,24 @@
                     <label>Klasse</label>
                     <select id="filterGrade"><option value="">Alle</option></select>
                 </div>
-                <div class="filter-group">
-                    <label>Kompetenz</label>
-                    <select id="filterCompetence"><option value="">Alle</option></select>
-                </div>
-                <div class="filter-group">
-                    <label>Tool</label>
-                    <select id="filterTool"><option value="">Alle</option></select>
-                </div>
-                <div class="filter-group">
-    <label>Niveaustufe</label>  <!-- Neuer Filter -->
+<div class="filter-group">
+    <label>Kompetenz</label>
+    <select id="filterCompetence"><option value="">Alle</option></select>
+</div>
+<div class="filter-group">
+    <label>Niveaustufe</label>
     <select id="filterLevel">
         <option value="">Alle</option>
-        <option value="Level 1 (Einstieg)">Level 1 (Einstieg)</option>
-        <option value="Level 2 (Grundlagen)">Level 2 (Grundlagen)</option>
-        <option value="Level 3 (Fortgeschritten)">Level 3 (Fortgeschritten)</option>
-        <option value="Level 4 (Experte)">Level 4 (Experte)</option>
-        <option value="Level 5 (Meister)">Level 5 (Meister)</option>
+        <option value="Niveaustufe 1">Niveaustufe 1</option>
+        <option value="Niveaustufe 2">Niveaustufe 2</option>
+        <option value="Niveaustufe 3">Niveaustufe 3</option>
+        <option value="Niveaustufe 4">Niveaustufe 4</option>
+        <option value="Niveaustufe 5">Niveaustufe 5</option>
     </select>
+</div>
+<div class="filter-group">
+    <label>Tool</label>
+    <select id="filterTool"><option value="">Alle</option></select>
 </div>
                 <div class="filter-group">
                     <label>Favoriten</label>
@@ -526,6 +526,7 @@
         <div class="export-buttons">
             <button class="btn csv" onclick="exportCSV()">CSV</button>
             <button class="btn pdf" onclick="exportPDF()">PDF</button>
+            <button class="btn matrix" onclick="exportMatrixCSV()" style="background:#e67e22;">Matrix (CSV)</button>
             <button class="btn print" onclick="window.print()">Drucken</button>
             <label class="btn import"> <input type="file" accept=".csv" class="file-input" onchange="importCSV(event)"> <span>Import</span> </label>
             <button class="btn template" onclick="exportTemplate()">Vorlage</button>
@@ -689,6 +690,28 @@ function updateToolFilter() {
     );
     displayResources(filtered);
     updateStats();
+}
+// === WIEDERVERWENDBARE FILTERLOGIK (ohne Anzeige) ===
+function getFilteredResources() {
+    const f = {
+        subject: document.getElementById('filterSubject')?.value.toLowerCase() || '',
+        grade: document.getElementById('filterGrade')?.value.toLowerCase() || '',
+        competence: document.getElementById('filterCompetence')?.value.toLowerCase() || '',
+        level: document.getElementById('filterLevel')?.value || '',
+        tool: document.getElementById('filterTool')?.value.toLowerCase() || '',
+        favorite: document.getElementById('filterFavorite')?.value || '',
+        topic: document.getElementById('searchTopic')?.value.toLowerCase() || ''
+    };
+
+    return resources.filter(r =>
+        (!f.subject || r.subject.toLowerCase() === f.subject) &&
+        (!f.grade || r.grade.toLowerCase() === f.grade) &&
+        (!f.competence || r.competence.toLowerCase() === f.competence) &&
+        (!f.level || r.level === f.level) &&
+        (!f.tool || (r.tool && r.tool.toLowerCase() === f.tool)) &&
+        (f.favorite === '' || r.favorite === (f.favorite === 'true')) &&
+        (!f.topic || r.topic.toLowerCase().includes(f.topic))
+    );
 }
 
     function resetFilters() {
@@ -1025,75 +1048,65 @@ function deleteResource(i) {
         link.click();
     }
 
-    function exportCSV() {
-        if (resources.length === 0) { showAlert("Keine Daten!"); return; }
-        let chunkSize = 500;
-        let chunks = [];
-        for (let i = 0; i < resources.length; i += chunkSize) {
-            let chunk = resources.slice(i, i + chunkSize).map(r => {
-                return `"${(r.topic||'').replace(/"/g, '""')}","${r.subject||''}","${r.grade||''}",""${r.competence}","${r.level || ''}","${(r.tool||'').replace(/"/g, '""')}","${(r.description||'').replace(/"/g, '""')}"`;
-            }).join('\n');
-            chunks.push('Thema,Unterrichtsfach,Klassenstufe,Kompetenzbereich,Digitales Hilfsmittel,Beschreibung\n' + chunk);
-        }
-        let zip = new JSZip();
-        chunks.forEach((chunk, i) => zip.file(`ressourcen_teil_${i+1}.csv`, chunk));
-        zip.generateAsync({type: "blob"}).then(content => {
-            let link = document.createElement('a');
-            link.href = URL.createObjectURL(content);
-            link.download = 'lerndashboard_ressourcen.zip';
-            link.click();
-        });
+function exportCSV() {
+    if (resources.length === 0) { 
+        showAlert("Keine Daten zum Exportieren!"); 
+        return; 
     }
 
-    function exportPDF() {
-        const { jsPDF } = window.jspdf;
-        if (resources.length === 0) { showAlert("Keine Daten!"); return; }
-        const doc = new jsPDF('p', 'mm', 'a4');
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-        let y = 25;
-        let pageNumber = 1;
-        doc.setFontSize(20);
-        doc.setTextColor(107, 70, 193);
-        doc.text('LernDashboard', pageWidth / 2, y, { align: 'center' });
-        y += 8;
-        doc.setFontSize(12);
-        doc.setTextColor(100);
-        doc.text('Digitale Unterrichtsideen', pageWidth / 2, y, { align: 'center' });
-        y += 15;
-        const footer = () => {
-            doc.setFontSize(9);
-            doc.setTextColor(150);
-            doc.text(`Exportiert am: ${new Date().toLocaleDateString('de-DE')}`, 15, pageHeight - 10);
-            doc.text(`Seite ${pageNumber}`, pageWidth - 30, pageHeight - 10);
-        };
-        resources.forEach((r, i) => {
-            if (y > 260) { footer(); doc.addPage(); y = 25; pageNumber++; }
-            doc.setFontSize(11);
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(0);
-            doc.text(`${i+1}. ${r.topic}`, 15, y);
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(10);
-            let x = 15;
-            doc.setTextColor(100);
-            doc.text(r.grade || '—', x, y + 6); x += 35;
-            doc.setTextColor(233, 30, 99);
-            doc.text(r.competence || '—', x, y + 6); x += 70;
-            doc.setTextColor(0, 191, 255);
-            doc.text(r.level || '—', x, y + 6); x += 50;  // Neues Feld in PDF
-            doc.setTextColor(39, 174, 96);
-            doc.text(r.tool || '—', x, y + 6);
-            if (r.lastModified) {
-                doc.setTextColor(150);
-                doc.setFontSize(9);
-                doc.text(`Zuletzt: ${r.lastModified}`, 15, y + 11);
-            }
-            y += 20;
-        });
-        footer();
-        doc.save('LernDashboard_Ressourcen.pdf');
+    const header = '\uFEFFThema,Unterrichtsfach,Klassenstufe,Kompetenzbereich,Niveaustufe,Digitales Hilfsmittel,Beschreibung\n'; // BOM + korrekte Header (Kompetenzbereich statt Kompetenz)
+
+    // Hilfsfunktion: Sauberes Escaping (CSV-Standard: RFC 4180)
+    function escapeCSVField(field) {
+        if (!field) return ''; // Leere Felder: leer lassen (nicht "")
+        field = field.toString().replace(/"/g, '""'); // Double quotes
+        field = field.replace(/\n/g, ' '); // Zeilenumbrüche zu Space (verhindert Zeilensprünge)
+        field = field.replace(/\r/g, ' '); // Carriage Returns
+        return `"${field}"`; // Immer mit Quotes umschließen (sicherer)
     }
+
+    // Chunking für große Dateien (max 500 pro CSV)
+    const chunkSize = 500;
+    let chunks = [];
+    for (let i = 0; i < resources.length; i += chunkSize) {
+        let chunk = resources.slice(i, i + chunkSize)
+            .map(r => {
+                return [
+                    escapeCSVField(r.topic),
+                    escapeCSVField(r.subject),
+                    escapeCSVField(r.grade),
+                    escapeCSVField(r.competence), // competence → Kompetenzbereich
+                    escapeCSVField(r.level),
+                    escapeCSVField(r.tool),
+                    escapeCSVField(r.description)
+                ].join(',');
+            })
+            .join('\n');
+
+        chunks.push(header + chunk); // Header pro Chunk (wichtig für ZIP)
+    }
+
+    // ZIP für Chunks (bei >1 Chunk)
+    if (chunks.length > 1) {
+        let zip = new JSZip();
+        chunks.forEach((chunk, i) => {
+            zip.file(`ressourcen_teil_${i + 1}.csv`, chunk);
+        });
+        zip.generateAsync({ type: "blob" }).then(content => {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = `LernDashboard_Ressourcen_${new Date().toISOString().slice(0, 10)}.zip`;
+            link.click();
+        });
+    } else {
+        // Einzelne CSV
+        const blob = new Blob([chunks[0]], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `LernDashboard_Ressourcen_${new Date().toISOString().slice(0, 10)}.csv`;
+        link.click();
+    }
+}
         function autoBackup() {
     const date = new Date().toISOString().slice(0,10); // z. B. 2025-11-02
     exportCSV(); // Startet den normalen CSV-Export
@@ -1198,6 +1211,68 @@ if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.p
     } else {
         alert('Popup wurde blockiert – bitte erlauben!');
     }
+}
+function exportMatrixCSV() {
+    const filtered = getFilteredResources();
+
+    console.log("Gefilterte Ressourcen:", filtered.length, filtered);
+    if (filtered.length === 0) {
+        showAlert("Keine passenden Ressourcen für die Matrix!\nTipp: Filter zurücksetzen oder Daten prüfen.");
+        return;
+    }
+
+    const competences = [
+        "Suchen, Verarbeiten und Aufbewahren",
+        "Kommunizieren und Kooperieren",
+        "Produzieren und Präsentieren",
+        "Schützen und sicher Agieren",
+        "Problemlösen und Handeln",
+        "Analysieren und Reflektieren"
+    ];
+
+    const levels = ["Niveaustufe 1", "Niveaustufe 2", "Niveaustufe 3", "Niveaustufe 4", "Niveaustufe 5"];
+
+    const matrix = {};
+    competences.forEach(c => {
+        matrix[c] = {};
+        levels.forEach(l => matrix[c][l] = []);
+    });
+
+    // === HIER: KLASSE | THEMA | TOOL ===
+    filtered.forEach(r => {
+        const c = r.competence?.trim();
+        const l = r.level?.trim();
+        const grade = r.grade?.trim() || '—';
+        const topic = r.topic?.trim() || '—';
+        const tool = r.tool?.trim() || '—';
+
+        if (c && l && matrix[c] && matrix[c][l]) {
+            const entry = `${grade} | ${topic} | ${tool}`;
+            matrix[c][l].push(entry);
+        }
+    });
+
+    let csv = '\uFEFFKompetenz;' + levels.join(';') + '\n';
+
+    competences.forEach(c => {
+        let row = `"${c}"`;
+        levels.forEach(l => {
+            const entries = matrix[c][l];
+            let cell = entries.length > 0 
+                ? entries.map(e => e.replace(/"/g, '""')).join('\n')
+                : '—';
+            row += `;"${cell}"`;
+        });
+        csv += row + '\n';
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `LernDashboard_Matrix_Details_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+
+    showAlert("Matrix exportiert!\nÖffne in Excel → Zellen → Zeilenumbruch aktivieren.");
 }
  </script>  <!-- ← ENDE SCRIPT -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
