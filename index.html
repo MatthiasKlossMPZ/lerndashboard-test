@@ -904,170 +904,269 @@ function deleteResource(i) {
         });
     }
 
-    // === CSV-IMPORT ===
-    function importCSV(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const text = e.target.result;
-            let lines = text.split(/\r\n|\n|\r/).map(l => l.trim()).filter(l => l);
-            if (lines.length < 1) { showAlert("CSV-Datei ist leer!"); return; }
-            const parsed = parseCSV(lines);
-            if (!parsed || parsed.data.length === 0) { showAlert("Keine gültigen Daten gefunden!"); return; }
-            const { header, data } = parsed;
-            const required = ['Thema', 'Unterrichtsfach', 'Klassenstufe', 'Kompetenzbereich'];
-            const missing = required.filter(col => !header.includes(col));
-            if (missing.length > 0) {
-                showAlert(`Fehlende Spalten: ${missing.join(', ')}\n\nGefundene Spalten: ${header.join(', ')}`);
-                return;
-            }
-            const previewLines = data.slice(0, 8).map(row => {
-                return `${row.Thema || ''} | ${row.Unterrichtsfach || ''} | ${row.Klassenstufe || ''} | ${row.Digitales_Hilfsmittel || ''}`;
-            }).join('\n');
-            const total = data.length;
-            if (!confirm(`Vorschau (max. 8 Zeilen):\n\n${previewLines}\n${total > 8 ? `\n... und ${total - 8} weitere` : ''}\n\nImportieren? (${total} Ressourcen)`)) return;
-            importWithProgress(data, header);
-        };
-        reader.readAsText(file, 'UTF-8');
-    }
+    // === CSV-IMPORT (KORRIGIERT & VERBESSERT) ===
+function importCSV(event) {
+    const file = event.target.files[0];
+    if (!file) return;
 
-    function parseCSV(lines) {
-        const result = { header: [], data: [] };
-        let headerLine = lines[0];
-        let dataLines = lines.slice(1);
-        const headerCells = [];
-        let inQuotes = false;
-        let cell = '';
-        for (let i = 0; i < headerLine.length; i++) {
-            const char = headerLine[i];
-            if (char === '"') { inQuotes = !inQuotes; continue; }
-            if (char === ',' && !inQuotes) { headerCells.push(cell.trim()); cell = ''; } else { cell += char; }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const text = e.target.result;
+        const lines = text.split(/\r\n|\n|\r/).map(l => l.trim()).filter(l => l);
+        if (lines.length === 0) {
+            showAlert("Die CSV-Datei ist leer!");
+            return;
         }
-        headerCells.push(cell.trim());
-        result.header = headerCells;
 
-        for (let line of dataLines) {
-            const row = {};
-            let inQuotes = false;
-            let cell = '';
-            let colIndex = 0;
-            for (let i = 0; i < line.length; i++) {
-                const char = line[i];
-                if (char === '"') {
-                    if (i + 1 < line.length && line[i + 1] === '"') { cell += '"'; i++; } else { inQuotes = !inQuotes; }
-                    continue;
-                }
-                if (char === ',' && !inQuotes) {
-                    const headerKey = result.header[colIndex] || `col${colIndex}`;
-                    row[normalizeHeader(headerKey)] = cell.trim();
-                    cell = ''; colIndex++;
-                } else { cell += char; }
-            }
-            const headerKey = result.header[colIndex] || `col${colIndex}`;
-            row[normalizeHeader(headerKey)] = cell.trim();
-            if (row.Thema) result.data.push(row);
+        const parsed = parseCSV(lines);
+        if (!parsed || parsed.data.length === 0) {
+            showAlert("Keine gültigen Daten in der CSV gefunden!");
+            return;
         }
-        return result;
+
+        const { header, data } = parsed;
+
+        // === PRÜFEN: Mindestens die 4 Pflichtfelder vorhanden? ===
+        const required = ['Thema', 'Unterrichtsfach', 'Klassenstufe', 'Kompetenzbereich'];
+        const missing = required.filter(col => !header.includes(col));
+        if (missing.length > 0) {
+            showAlert(
+                `Fehlende Pflichtspalten: ${missing.join(', ')}\n\n` +
+                `Gefundene Spalten: ${header.join(', ')}\n\n` +
+                `Tipp: Verwende die Vorlage (Button "Vorlage")!`
+            );
+            return;
+        }
+
+        // === VORSCHAU ===
+        const previewLines = data.slice(0, 8).map(row => 
+            `${row.Thema || ''} | ${row.Unterrichtsfach || ''} | ${row.Klassenstufe || ''} | ${row.Kompetenzbereich || ''} | ${row.Niveaustufe || ''} | ${row.Digitales_Hilfsmittel || ''}`
+        ).join('\n');
+
+        const total = data.length;
+        if (!confirm(
+            `Vorschau (max. 8 Zeilen):\n\n${previewLines}\n${total > 8 ? `\n... und ${total - 8} weitere` : ''}\n\n` +
+            `Importieren? (${total} Ressourcen)`
+        )) return;
+
+        importWithProgress(data);
+    };
+    reader.readAsText(file, 'UTF-8');
+}
+// === CSV-PARSER (ROBUST & KORREKT) ===
+function parseCSV(lines) {
+    const result = { header: [], data: [] };
+    if (lines.length === 0) return result;
+
+    // --- HEADER ---
+    let headerLine = lines[0];
+    result.header = splitCSVLine(headerLine);
+
+    // --- DATEN ---
+    for (let i = 1; i < lines.length; i++) {
+        const row = {};
+        const cells = splitCSVLine(lines[i]);
+        result.header.forEach((key, idx) => {
+            const normalizedKey = normalizeHeader(key);
+            row[normalizedKey] = (cells[idx] || '').trim();
+        });
+        if (row.Thema) result.data.push(row); // Nur Zeilen mit Thema
     }
 
-    function normalizeHeader(str) {
-        return str
-            .replace(/Digitales Hilfsmittel/g, 'Digitales_Hilfsmittel')
-            .replace(/Beschreibung/g, 'Beschreibung')
-            .replace(/[^a-zA-Z0-9_]/g, '_');
-    }
+    return result;
+}
+// === HELFER: CSV-ZEILE SPLITTEN (MIT ANFÜHRUNGSZEICHEN) ===
+function splitCSVLine(line) {
+    const result = [];
+    let cell = '';
+    let inQuotes = false;
 
-    function importWithProgress(data, header) {
-        let imported = 0, skipped = 0, errors = [];
-        const modal = document.createElement('div');
-        modal.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:10000;font-family:Segoe UI,sans-serif;`;
-        modal.innerHTML = `<div style="background:#fff;padding:24px;border-radius:16px;max-width:500px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        const nextChar = line[i + 1];
+
+        if (char === '"') {
+            if (inQuotes && nextChar === '"') {
+                cell += '"';
+                i++; // Überspringe doppeltes ""
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (char === ',' && !inQuotes) {
+            result.push(cell);
+            cell = '';
+        } else {
+            cell += char;
+        }
+    }
+    result.push(cell);
+    return result;
+}
+// === HEADER NORMALISIERUNG (FÜR FLEXIBILITÄT) ===
+function normalizeHeader(str) {
+    return str
+        .replace(/Digitales Hilfsmittel/g, 'Digitales_Hilfsmittel')
+        .replace(/Beschreibung/g, 'Beschreibung')
+        .replace(/Niveaustufe/g, 'Niveaustufe')
+        .replace(/Klassenstufe/g, 'Klassenstufe')
+        .replace(/Kompetenzbereich/g, 'Kompetenzbereich')
+        .replace(/Unterrichtsfach/g, 'Unterrichtsfach')
+        .replace(/[^a-zA-Z0-9_ÄÖÜäöüß]/g, '_'); // Sonderzeichen → _
+}
+// === IMPORT MIT FORTSCHRITT ===
+function importWithProgress(data) {
+    let imported = 0, skipped = 0, errors = [];
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position:fixed;top:0;left:0;width:100%;height:100%;
+        background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;
+        z-index:10000;font-family:Segoe UI,sans-serif;
+    `;
+    modal.innerHTML = `
+        <div style="background:#fff;padding:24px;border-radius:16px;max-width:500px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
             <h3 style="margin:0 0 16px;color:#6b46c1;">Import läuft...</h3>
-            <div style="background:#f0f0f0;height:12px;border-radius:6px;overflow:hidden;margin:16px 0;"><div id="progressBar" style="background:#6b46c1;width:0%;height:100%;transition:width 0.2s;"></div></div>
+            <div style="background:#f0f0f0;height:12px;border-radius:6px;overflow:hidden;margin:16px 0;">
+                <div id="progressBar" style="background:#6b46c1;width:0%;height:100%;transition:width 0.2s;"></div>
+            </div>
             <p id="status" style="margin:8px 0;font-size:14px;color:#555;">0 von ${data.length}</p>
             <p id="log" style="max-height:120px;overflow-y:auto;font-size:13px;color:#333;margin-top:12px;"></p>
-        </div>`;
-        document.body.appendChild(modal);
-        const progressBar = modal.querySelector('#progressBar');
-        const status = modal.querySelector('#status');
-        const log = modal.querySelector('#log');
+        </div>
+    `;
+    document.body.appendChild(modal);
 
-        const processChunk = (index) => {
-            if (index >= data.length) {
-                modal.remove();
-                const summary = `Import abgeschlossen!\n\n${imported} hinzugefügt\n${skipped} übersprungen\n${errors.length} Fehler`;
-                showAlert(summary + (errors.length > 0 ? '\n\nFehler: ' + errors.slice(0, 5).join('; ') : ''));
-                localStorage.setItem('resources', JSON.stringify(resources));
-                updateToolFilter();
-                applyFilters();
-                return;
-            }
-            const row = data[index];
-            try {
-                const newRes = {
-                    topic: (row.Thema || '').trim(),
-                    subject: (row.Unterrichtsfach || '').trim(),
-                    grade: (row.Klassenstufe || '').trim(),
-                    competence: (row.Kompetenzbereich || '').trim(),
-                    level: (row.Niveaustufe || '').trim(),   
-                    tool: (row.Digitales_Hilfsmittel || '').trim(),
-                    description: (row.Beschreibung || '').trim(),
-                    favorite: false,
-                    lastModified: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                };
-                const duplicate = resources.some(r => r.topic === newRes.topic && r.subject === newRes.subject && r.grade === newRes.grade && (r.level || '') === (newRes.level || ''));
-                if (duplicate) {
-                    skipped++;
-                    log.innerHTML += `<div style="color:#e67e22;">Übersprungen: Duplikat "${newRes.topic}"</div>`;
-                } else if (newRes.topic && newRes.subject && newRes.grade && newRes.competence) {
-                    resources.push(newRes);
-                    if (newRes.tool) tools.add(newRes.tool.toLowerCase());
-                    imported++;
-                } else {
-                    errors.push(`Ungültig: ${newRes.topic || 'unbekannt'}`);
-                    log.innerHTML += `<div style="color:#e74c3c;">Fehler: Unvollständig "${newRes.topic}"</div>`;
-                }
-            } catch (err) {
-                errors.push(`Zeile ${index + 2}: ${err.message}`);
-            }
-            const percent = ((index + 1) / data.length) * 100;
-            progressBar.style.width = percent + '%';
-            status.textContent = `${index + 1} von ${data.length}`;
-            log.scrollTop = log.scrollHeight;
-            setTimeout(() => processChunk(index + 1), 1);
-        };
-        processChunk(0);
-    }
+    const progressBar = modal.querySelector('#progressBar');
+    const status = modal.querySelector('#status');
+    const log = modal.querySelector('#log');
 
-    function exportTemplate() {
-        const template = "Thema,Unterrichtsfach,Klassenstufe,Kompetenzbereich,Niveaustufe,Digitales Hilfsmittel,Beschreibung\nBeispiel-Thema,Mathematik,Klasse 5,Problemlösen und Handeln,GeoGebra,Beispielsatz";
-        const blob = new Blob(['\uFEFF' + template], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = 'beispiel-lerndashboard.csv';
-        link.click();
-    }
+    const processChunk = (index) => {
+        if (index >= data.length) {
+            modal.remove();
+            const summary = `Import abgeschlossen!\n\n` +
+                `${imported} hinzugefügt\n` +
+                `${skipped} übersprungen (Duplikat)\n` +
+                `${errors.length} Fehler`;
+            showAlert(summary + (errors.length > 0 ? `\n\nBeispiele:\n${errors.slice(0, 3).join('\n')}` : ''));
+            localStorage.setItem('resources', JSON.stringify(resources));
+            updateToolFilter();
+            applyFilters();
+            return;
+        }
+
+        const row = data[index];
+        try {
+            const newRes = {
+                topic: row.Thema?.trim() || '',
+                subject: row.Unterrichtsfach?.trim() || '',
+                grade: row.Klassenstufe?.trim() || '',
+                competence: row.Kompetenzbereich?.trim() || '',
+                level: row.Niveaustufe?.trim() || '',
+                tool: row.Digitales_Hilfsmittel?.trim() || '',
+                description: row.Beschreibung?.trim() || '',
+                favorite: false,
+                lastModified: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            };
+
+            // Pflichtfelder prüfen
+            if (!newRes.topic || !newRes.subject || !newRes.grade || !newRes.competence) {
+                errors.push(`Zeile ${index + 2}: Fehlende Pflichtdaten`);
+                log.innerHTML += `<div style="color:#e74c3c;">Fehler: Unvollständig "${newRes.topic}"</div>`;
+            }
+            // Duplikat prüfen (Thema + Fach + Klasse + Niveaustufe)
+            else if (resources.some(r =>
+                r.topic === newRes.topic &&
+                r.subject === newRes.subject &&
+                r.grade === newRes.grade &&
+                r.level === newRes.level
+            )) {
+                skipped++;
+                log.innerHTML += `<div style="color:#e67e22;">Übersprungen: Duplikat "${newRes.topic}"</div>`;
+            }
+            else {
+                resources.push(newRes);
+                if (newRes.tool) tools.add(newRes.tool.toLowerCase());
+                imported++;
+            }
+        } catch (err) {
+            errors.push(`Zeile ${index + 2}: ${err.message}`);
+            log.innerHTML += `<div style="color:#e74c3c;">Fehler: ${err.message}</div>`;
+        }
+
+        const percent = ((index + 1) / data.length) * 100;
+        progressBar.style.width = percent + '%';
+        status.textContent = `${index + 1} von ${data.length}`;
+        log.scrollTop = log.scrollHeight;
+
+        setTimeout(() => processChunk(index + 1), 1);
+    };
+
+    processChunk(0);
+}
+
+function exportTemplate() {
+    const template = [
+        'Thema,Unterrichtsfach,Klassenstufe,Kompetenzbereich,Niveaustufe,Digitales Hilfsmittel,Beschreibung',
+        'Beispiel: Klimawandel,Geografie,Klasse 7,Analysieren und Reflektieren,Niveaustufe 3,Google Earth,"Beschreibung des Einsatzes..."'
+    ].join('\n');
+
+    const blob = new Blob(['\uFEFF' + template], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'Lerndashboard_Vorlage.csv';
+    link.click();
+}
 
     function exportCSV() {
-        if (resources.length === 0) { showAlert("Keine Daten!"); return; }
-        let chunkSize = 500;
-        let chunks = [];
-        for (let i = 0; i < resources.length; i += chunkSize) {
-            let chunk = resources.slice(i, i + chunkSize).map(r => {
-                return `"${(r.topic||'').replace(/"/g, '""')}","${r.subject||''}","${r.grade||''}",""${r.competence}","${r.level || ''}","${(r.tool||'').replace(/"/g, '""')}","${(r.description||'').replace(/"/g, '""')}"`;
-            }).join('\n');
-            chunks.push('Thema,Unterrichtsfach,Klassenstufe,Kompetenzbereich,Digitales Hilfsmittel,Beschreibung\n' + chunk);
-        }
-        let zip = new JSZip();
-        chunks.forEach((chunk, i) => zip.file(`ressourcen_teil_${i+1}.csv`, chunk));
-        zip.generateAsync({type: "blob"}).then(content => {
-            let link = document.createElement('a');
-            link.href = URL.createObjectURL(content);
-            link.download = 'lerndashboard_ressourcen.zip';
-            link.click();
-        });
+    if (resources.length === 0) {
+        showAlert("Keine Daten zum Exportieren!");
+        return;
     }
+
+    // === EINHEITLICHE SPALTENDEFINITION (für Export, Import, Vorlage) ===
+    const COLUMNS = [
+        'Thema',
+        'Unterrichtsfach',
+        'Klassenstufe',
+        'Kompetenzbereich',
+        'Niveaustufe',
+        'Digitales Hilfsmittel',
+        'Beschreibung'
+    ];
+
+    const HEADER = COLUMNS.join(',') + '\n';
+
+    // === CHUNK-EXPORT (für große Datenmengen) ===
+    const chunkSize = 500;
+    const chunks = [];
+
+    for (let i = 0; i < resources.length; i += chunkSize) {
+        const chunk = resources.slice(i, i + chunkSize).map(r => {
+            return [
+                `"${(r.topic || '').replace(/"/g, '""')}"`,
+                `"${(r.subject || '')}"`,
+                `"${(r.grade || '')}"`,
+                `"${(r.competence || '')}"`,
+                `"${(r.level || '')}"`,
+                `"${(r.tool || '').replace(/"/g, '""')}"`,
+                `"${(r.description || '').replace(/"/g, '""')}"`
+            ].join(',');
+        }).join('\n');
+
+        chunks.push(HEADER + chunk);
+    }
+
+    // === ZIP-ERSTELLUNG ===
+    const zip = new JSZip();
+    chunks.forEach((chunk, index) => {
+        zip.file(`ressourcen_teil_${index + 1}.csv`, '\uFEFF' + chunk); // BOM für UTF-8
+    });
+
+    zip.generateAsync({ type: 'blob' }).then(content => {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(content);
+        link.download = `LernDashboard_Ressourcen_${new Date().toISOString().slice(0, 10)}.zip`;
+        link.click();
+    });
+}
 
     function exportPDF() {
         const { jsPDF } = window.jspdf;
