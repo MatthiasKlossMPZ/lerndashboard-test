@@ -1256,35 +1256,80 @@ function exportMatrixPDF() {
     const startX = 15;
     let currentY = 25;
 
-    // === TITEL AUF ERSTER SEITE ===
-    doc.setFontSize(18);
-    doc.setTextColor(107, 70, 193);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Alle Fächer – Alle Klassen', pageWidth / 2, currentY, { align: 'center' });
-    currentY += 8;
-    doc.setFontSize(12);
-    doc.setTextColor(100);
-    doc.text(`Export: ${new Date().toLocaleDateString('de-DE')}`, pageWidth - 30, currentY, { align: 'right' });
-    currentY += 15;
+// === DYNAMISCHE ÜBERSCHRIFT (nur Fach, Klasse, Tool) ===
+const subjectFilter = document.getElementById('filterSubject')?.value?.trim() || '';
+const gradeFilter = document.getElementById('filterGrade')?.value?.trim() || '';
+const toolFilter = document.getElementById('filterTool')?.value?.trim().toLowerCase() || '';
 
-    // === DATEN SAMMELN ===
-    const matrix = {};
-    competences.forEach(c => {
-        matrix[c] = {};
-        levels.forEach(l => matrix[c][l] = []);
-    });
+// --- FACH ---
+const subjectText = subjectFilter ? subjectFilter : 'Alle Fächer';
 
-    filtered.forEach(r => {
-        const comp = r.competence?.trim();
-        const level = r.level?.trim();
-        const topic = r.topic?.trim();
-        const grade = r.grade?.trim();
-        const tool = r.tool?.trim();
+// --- KLASSE ---
+let gradeText = '';
+if (gradeFilter) {
+    gradeText = gradeFilter;
+} else {
+    const allGrades = [...new Set(resources.map(r => r.grade))].filter(Boolean);
+    if (allGrades.length > 0) {
+        const sorted = allGrades.sort((a, b) => {
+            const numA = parseInt(a.match(/\d+/)?.[0] || 0);
+            const numB = parseInt(b.match(/\d+/)?.[0] || 0);
+            return numA - numB;
+        });
+        const first = sorted[0].match(/\d+/)?.[0];
+        const last = sorted[sorted.length - 1].match(/\d+/)?.[0];
+        gradeText = first && last ? `Klassen ${first}–${last}` : 'Alle Klassen';
+    } else {
+        gradeText = 'Alle Klassen';
+    }
+}
 
-        if (comp && level && topic && matrix[comp]?.[level]) {
-            matrix[comp][level].push(`Klasse ${grade}\n${topic}\n${tool || '—'}`);
-        }
-    });
+// --- TOOL ---
+const toolText = toolFilter ? ` | Tool: ${toolFilter}` : '';
+
+// --- TITEL ---
+const title = `${subjectText} – ${gradeText}${toolText}`;
+
+// === TITEL ZEICHNEN ===
+doc.setFontSize(18);
+doc.setTextColor(107, 70, 193);
+doc.setFont('helvetica', 'bold');
+doc.text(title, pageWidth / 2, currentY, { align: 'center' });
+currentY += 10;
+
+// Export-Datum
+doc.setFontSize(12);
+doc.setTextColor(100);
+doc.text(`Export: ${new Date().toLocaleDateString('de-DE')}`, pageWidth - 30, currentY - 2, { align: 'right' });
+currentY += 15;
+
+    // === DATEN FÜR MATRIX (nur Fach, Klasse, Tool filtern) ===
+const matrix = {};
+competences.forEach(c => {
+    matrix[c] = {};
+    levels.forEach(l => matrix[c][l] = []);
+});
+
+// Gehe durch ALLE Ressourcen
+resources.forEach(r => {
+    const subject = r.subject?.trim();
+    const grade = r.grade?.trim();
+    const tool = r.tool?.trim().toLowerCase();
+    const comp = r.competence?.trim();
+    const level = r.level?.trim();
+    const topic = r.topic?.trim();
+
+    if (!comp || !level || !topic) return;
+
+    // Filterprüfung
+    const matchesSubject = !subjectFilter || subject === subjectFilter;
+    const matchesGrade = !gradeFilter || grade === gradeFilter;
+    const matchesTool = !toolFilter || tool === toolFilter.toLowerCase();
+
+    if (matchesSubject && matchesGrade && matchesTool) {
+        matrix[comp][level].push(`Klasse ${grade}\n${topic}\n${r.tool || '—'}`);
+    }
+});
 
     // === FUNKTION: HEADER ZEICHNEN (mit dünner Linie unten) ===
     function drawHeader(y) {
