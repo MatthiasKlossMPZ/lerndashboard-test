@@ -1285,7 +1285,7 @@ function exportMatrixPDF() {
         levels.forEach(l => matrix[c][l] = []);
     });
 
-    // === DATEN FÜLLEN (FEHLER BEHOBEN!) ===
+    // === DATEN FÜLLEN ===
     resources.forEach(r => {
         const subject = r.subject?.trim();
         const grade = r.grade?.trim();
@@ -1316,7 +1316,6 @@ function exportMatrixPDF() {
         const h = 11;
         let x = leftMargin;
 
-        // Kompetenz
         doc.setFillColor(107, 70, 193);
         doc.rect(x, y, compColWidth, h, 'F');
         doc.setTextColor(255);
@@ -1326,7 +1325,6 @@ function exportMatrixPDF() {
 
         x += compColWidth;
 
-        // Levels
         levels.forEach((lvl, i) => {
             doc.setFillColor(...levelColors[i]);
             doc.rect(x, y, levelColWidth, h, 'F');
@@ -1348,85 +1346,93 @@ function exportMatrixPDF() {
     let headerBottom = drawHeader(currentY);
     currentY = headerBottom;
 
-    // === ZEILEN ===
-    const COMP_FONT_SIZE = 9.5;
-    const LEVEL_FONT_SIZE = 8.2;
-    const LINE_HEIGHT_FACTOR = 1.25;
-    const MIN_ROW_HEIGHT = 20;
-    const LINE_HEIGHT_COMP = COMP_FONT_SIZE * LINE_HEIGHT_FACTOR * 0.3528;
-    const LINE_HEIGHT_LEVEL = LEVEL_FONT_SIZE * LINE_HEIGHT_FACTOR * 0.3528;
+// === ZEILEN – EXAKTE HÖHE AUS SPLITTEXTTOSIZE ===
+const COMP_FONT_SIZE = 9.5;
+const LEVEL_FONT_SIZE = 8.0;
+const LINE_HEIGHT_FACTOR = 1.2;
+const MIN_ROW_HEIGHT = 12;
+const LINE_HEIGHT_COMP = COMP_FONT_SIZE * LINE_HEIGHT_FACTOR * 0.3528;
+const LINE_HEIGHT_LEVEL = LEVEL_FONT_SIZE * LINE_HEIGHT_FACTOR * 0.3528;
+const PADDING_FACTOR = 0.25;
 
-    competences.forEach((comp) => {
-        let maxLines = 1;
-        levels.forEach(l => {
-            const entries = matrix[comp][l];
-            const lines = entries.reduce((s, e) => s + e.split('\n').length, 0);
-            const gaps = entries.length > 0 ? entries.length - 1 : 0;
-            maxLines = Math.max(maxLines, lines + gaps);
-        });
+competences.forEach((comp) => {
+    // 1. Kompetenz-Text
+    const compText = comp;
+    const compLines = doc.splitTextToSize(compText, compColWidth - 8);
+    const compTextHeight = compLines.length * LINE_HEIGHT_COMP;
 
-        const rowHeight = Math.max(MIN_ROW_HEIGHT, maxLines * 5.2 + 8);
-
-        // === SEITENUMBRUCH ===
-        if (currentY + rowHeight > pageHeight - 20) {
-            drawLine(leftMargin, headerBottom - 3, leftMargin, currentY);
-            drawLine(pageWidth - rightMargin, headerBottom - 3, pageWidth - rightMargin, currentY);
-
-            doc.addPage();
-            currentY = topMargin;
-
-            doc.setFontSize(10);
-            doc.setTextColor(100);
-            doc.text(`Fortsetzung – Seite ${doc.getCurrentPageInfo().pageNumber}`, pageWidth - rightMargin, currentY, { align: 'right' });
-            currentY += 8;
-
-            headerBottom = drawHeader(currentY);
-            currentY = headerBottom;
-        }
-
-        const rowY = currentY;
-        let x = leftMargin;
-
-        // === KOMPETENZ ZELLE ===
-        doc.setFillColor(248, 249, 255);
-        doc.rect(x, rowY, compColWidth, rowHeight, 'F');
-        doc.setTextColor(0);
-        doc.setFontSize(COMP_FONT_SIZE);
-        doc.setFont('helvetica', 'bold');
-
-        const compLines = doc.splitTextToSize(comp, compColWidth - 8);
-        const compTextHeight = compLines.length * LINE_HEIGHT_COMP;
-        const compStartY = rowY + (rowHeight - compTextHeight) / 2 + LINE_HEIGHT_COMP * 0.8;
-
-        doc.text(compLines, x + 4, compStartY);
-
-        drawLine(x + compColWidth, rowY, x + compColWidth, rowY + rowHeight);
-        x += compColWidth;
-
-        // === LEVEL ZELLEN ===
-        levels.forEach((lvl, j) => {
-            const rawText = matrix[comp][lvl].length > 0 ? matrix[comp][lvl].join('\n\n') : '—';
-            doc.setFillColor(255, 255, 255);
-            doc.rect(x, rowY, levelColWidth, rowHeight, 'F');
-            doc.setTextColor(60);
-            doc.setFontSize(LEVEL_FONT_SIZE);
-            doc.setFont('helvetica', 'normal');
-
-            const lines = doc.splitTextToSize(rawText, levelColWidth - 8);
-            const textHeight = lines.length * LINE_HEIGHT_LEVEL;
-            const startY = rowY + (rowHeight - textHeight) / 2 + LINE_HEIGHT_LEVEL * 0.8;
-
-            doc.text(lines, x + 4, startY);
-
-            if (j < 4) {
-                drawLine(x + levelColWidth, rowY, x + levelColWidth, rowY + rowHeight);
-            }
-            x += levelColWidth;
-        });
-
-        drawLine(leftMargin, rowY + rowHeight, pageWidth - rightMargin, rowY + rowHeight);
-        currentY += rowHeight;
+    // 2. Level-Texte (mit \n\n!)
+    let maxLevelTextHeight = 0;
+    levels.forEach(l => {
+        const entries = matrix[comp][l];
+        if (entries.length === 0) return;
+        const text = entries.join('\n\n');
+        const lines = doc.splitTextToSize(text, levelColWidth - 8);
+        const height = lines.length * LINE_HEIGHT_LEVEL;
+        if (height > maxLevelTextHeight) maxLevelTextHeight = height;
     });
+
+    // 3. Maximale Höhe in der Zeile
+    const maxTextHeight = Math.max(compTextHeight, maxLevelTextHeight);
+    const rowHeight = Math.max(MIN_ROW_HEIGHT, maxTextHeight + 4);  // +4 mm Rand
+
+    // === SEITENUMBRUCH ===
+    if (currentY + rowHeight > pageHeight - 20) {
+        drawLine(leftMargin, headerBottom - 3, leftMargin, currentY);
+        drawLine(pageWidth - rightMargin, headerBottom - 3, pageWidth - rightMargin, currentY);
+        doc.addPage();
+        currentY = topMargin;
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(`Fortsetzung – Seite ${doc.getCurrentPageInfo().pageNumber}`, pageWidth - rightMargin, currentY, { align: 'right' });
+        currentY += 8;
+        headerBottom = drawHeader(currentY);
+        currentY = headerBottom;
+    }
+
+    const rowY = currentY;
+    let x = leftMargin;
+
+    // === KOMPETENZ ZELLE ===
+    doc.setFillColor(248, 249, 255);
+    doc.rect(x, rowY, compColWidth, rowHeight, 'F');
+    doc.setTextColor(0);
+    doc.setFontSize(COMP_FONT_SIZE);
+    doc.setFont('helvetica', 'bold');
+
+    const compPadding = (rowHeight - compTextHeight) * PADDING_FACTOR;
+    const compStartY = rowY + compPadding + LINE_HEIGHT_COMP * 0.8;
+    doc.text(compLines, x + 4, compStartY);
+
+    drawLine(x + compColWidth, rowY, x + compColWidth, rowY + rowHeight);
+    x += compColWidth;
+
+    // === LEVEL ZELLEN ===
+    levels.forEach((lvl, j) => {
+        const entries = matrix[comp][lvl];
+        const rawText = entries.length > 0 ? entries.join('\n\n') : '—';
+        doc.setFillColor(255, 255, 255);
+        doc.rect(x, rowY, levelColWidth, rowHeight, 'F');
+        doc.setTextColor(60);
+        doc.setFontSize(LEVEL_FONT_SIZE);
+        doc.setFont('helvetica', 'normal');
+
+        const lines = doc.splitTextToSize(rawText, levelColWidth - 8);
+        const textHeight = lines.length * LINE_HEIGHT_LEVEL;
+        const padding = (rowHeight - textHeight) * PADDING_FACTOR;
+        const startY = rowY + padding + LINE_HEIGHT_LEVEL * 0.8;
+
+        doc.text(lines, x + 4, startY);
+
+        if (j < 4) {
+            drawLine(x + levelColWidth, rowY, x + levelColWidth, rowY + rowHeight);
+        }
+        x += levelColWidth;
+    });
+
+    drawLine(leftMargin, rowY + rowHeight, pageWidth - rightMargin, rowY + rowHeight);
+    currentY += rowHeight;
+});
 
     // === LETZTE LINIEN ===
     drawLine(leftMargin, headerBottom - 3, leftMargin, currentY);
