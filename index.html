@@ -1223,65 +1223,6 @@ if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.p
         alert('Popup wurde blockiert – bitte erlauben!');
     }
 }
-function exportMatrixCSV() {
-    const filtered = getFilteredResources();
-    if (filtered.length === 0) {
-        showAlert("Keine passenden Ressourcen für die Matrix!\nTipp: Filter zurücksetzen oder Daten prüfen.");
-        return;
-    }
-
-    const competences = [
-        "Suchen, Verarbeiten und Aufbewahren",
-        "Kommunizieren und Kooperieren",
-        "Produzieren und Präsentieren",
-        "Schützen und sicher Agieren",
-        "Problemlösen und Handeln",
-        "Analysieren und Reflektieren"
-    ];
-    const levels = ["Niveaustufe 1", "Niveaustufe 2", "Niveaustufe 3", "Niveaustufe 4", "Niveaustufe 5"];
-
-    // Matrix: competence -> level -> Set von "Thema (Klasse – Tool)"
-    const matrix = {};
-    competences.forEach(c => {
-        matrix[c] = {};
-        levels.forEach(l => matrix[c][l] = new Set());
-    });
-
-    // Daten eintragen
-    filtered.forEach(r => {
-        const comp = r.competence?.trim();
-        const level = r.level?.trim();
-        const topic = r.topic?.trim();
-        const grade = r.grade?.trim();
-        const tool = r.tool?.trim();
-
-        if (comp && level && topic && matrix[comp]?.[level]) {
-            const entry = `${topic} (${grade}${tool ? ` – ${tool}` : ''})`;
-            matrix[comp][level].add(entry);
-        }
-    });
-
-    // CSV generieren
-    let csv = '\uFEFF'; // UTF-8 BOM
-    csv += '"Kompetenz";' + levels.map(l => `"${l}"`).join(';') + '\n';
-
-    competences.forEach(comp => {
-        let row = [`"${comp}"`];
-        levels.forEach(level => {
-            const entries = [...matrix[comp][level]];
-            const cell = entries.length > 0 ? entries.join('\n') : '—';
-            row.push(`"${cell}"`);
-        });
-        csv += row.join(';') + '\n';
-    });
-
-    // Download
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `LernDashboard_Matrix_Detail_${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-}
 function exportMatrixPDF() {
     const { jsPDF } = window.jspdf;
     const filtered = getFilteredResources();
@@ -1293,18 +1234,6 @@ function exportMatrixPDF() {
     const doc = new jsPDF('l', 'mm', 'a4');
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    let y = 25;
-
-    // === TITEL ===
-    doc.setFontSize(18);
-    doc.setTextColor(107, 70, 193);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Alle Fächer – Alle Klassen', pageWidth / 2, y, { align: 'center' });
-    y += 8;
-    doc.setFontSize(12);
-    doc.setTextColor(100);
-    doc.text(`Export: ${new Date().toLocaleDateString('de-DE')}`, pageWidth - 30, y, { align: 'right' });
-    y += 15;
 
     // === KONFIG ===
     const competences = [
@@ -1325,24 +1254,18 @@ function exportMatrixPDF() {
     const lineHeight = 4.5;
     const padding = 3;
     const startX = 15;
-    let currentY = y;
+    let currentY = 25;
 
-    // === HEADER ===
-    doc.setFillColor(107, 70, 193);
-    doc.rect(startX, currentY, 45, baseRowHeight, 'F');
-    doc.setTextColor(255);
-    doc.setFontSize(11);
+    // === TITEL AUF ERSTER SEITE ===
+    doc.setFontSize(18);
+    doc.setTextColor(107, 70, 193);
     doc.setFont('helvetica', 'bold');
-    doc.text('Kompetenz', startX + 5, currentY + 12);
-
-    levels.forEach((level, i) => {
-        const x = startX + 45 + i * colWidth;
-        doc.setFillColor(...levelColors[i]);
-        doc.rect(x, currentY, colWidth, baseRowHeight, 'F');
-        doc.setTextColor(255);
-        doc.text(level, x + colWidth / 2, currentY + 12, { align: 'center' });
-    });
-    currentY += baseRowHeight;
+    doc.text('Alle Fächer – Alle Klassen', pageWidth / 2, currentY, { align: 'center' });
+    currentY += 8;
+    doc.setFontSize(12);
+    doc.setTextColor(100);
+    doc.text(`Export: ${new Date().toLocaleDateString('de-DE')}`, pageWidth - 30, currentY, { align: 'right' });
+    currentY += 15;
 
     // === DATEN SAMMELN ===
     const matrix = {};
@@ -1363,34 +1286,89 @@ function exportMatrixPDF() {
         }
     });
 
-    // === ZEILEN HÖHE BERECHNEN & ZEICHNEN ===
-    competences.forEach(comp => {
-        let maxLinesInRow = 1;
+    // === FUNKTION: HEADER ZEICHNEN (mit dünner Linie unten) ===
+    function drawHeader(y) {
+        const headerY = y;
+        const headerHeight = baseRowHeight;
 
+        // Kompetenz
+        doc.setFillColor(107, 70, 193);
+        doc.rect(startX, headerY, 45, headerHeight, 'F');
+        doc.setDrawColor(180);
+        doc.setLineWidth(0.2);
+        doc.rect(startX, headerY, 45, headerHeight, 'S');
+        doc.setTextColor(255);
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Kompetenz', startX + 5, headerY + 12);
+
+        // Niveaustufen
+        levels.forEach((level, i) => {
+            const x = startX + 45 + i * colWidth;
+            doc.setFillColor(...levelColors[i]);
+            doc.rect(x, headerY, colWidth, headerHeight, 'F');
+            doc.setDrawColor(180);
+            doc.setLineWidth(0.2);
+            doc.rect(x, headerY, colWidth, headerHeight, 'S');
+            doc.setTextColor(255);
+            doc.text(level, x + colWidth / 2, headerY + 12, { align: 'center' });
+        });
+
+        // Dünne Linie unter Header
+        doc.setDrawColor(180);
+        doc.setLineWidth(0.2);
+        doc.line(startX, headerY + headerHeight, startX + 45 + 5 * colWidth, headerY + headerHeight);
+
+        return headerY + headerHeight;
+    }
+
+    // === ERSTE SEITE: HEADER ===
+    let headerBottom = drawHeader(currentY);
+    currentY = headerBottom;
+
+    // === ZEILEN ZEICHNEN ===
+    let pageNumber = 1;
+
+    competences.forEach((comp, rowIndex) => {
+        let maxLinesInRow = 1;
         levels.forEach(level => {
             const entries = matrix[comp][level];
-            const linesInCell = entries.reduce((sum, entry) => sum + entry.split('\n').length, 0);
+            const linesInCell = entries.reduce((sum, e) => sum + e.split('\n').length, 0);
             const gaps = entries.length > 0 ? entries.length - 1 : 0;
             maxLinesInRow = Math.max(maxLinesInRow, linesInCell + gaps);
         });
 
         const rowHeight = Math.max(baseRowHeight, (maxLinesInRow * lineHeight) + (2 * padding));
-        const cellHeight = rowHeight;
 
-        // Neue Seite?
-        if (currentY + cellHeight > pageHeight - 20) {
+        // === SEITENUMBRUCH ===
+        if (currentY + rowHeight > pageHeight - 20) {
             doc.addPage();
+            pageNumber++;
             currentY = 25;
+
+            if (pageNumber > 1) {
+                doc.setFontSize(12);
+                doc.setTextColor(100);
+                doc.text(`Fortsetzung – Seite ${pageNumber}`, pageWidth - 30, currentY, { align: 'right' });
+                currentY += 8;
+            }
+            headerBottom = drawHeader(currentY);
+            currentY = headerBottom;
         }
+
+        const rowY = currentY;
 
         // Kompetenz-Zelle
         doc.setFillColor(240, 240, 255);
-        doc.rect(startX, currentY, 45, cellHeight, 'F');
+        doc.rect(startX, rowY, 45, rowHeight, 'F');
+        doc.setDrawColor(180);
+        doc.setLineWidth(0.2);
+        doc.rect(startX, rowY, 45, rowHeight, 'S');
         doc.setTextColor(0);
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
         const splitComp = doc.splitTextToSize(comp, 40);
-        doc.text(splitComp, startX + 5, currentY + padding + 4);
+        doc.text(splitComp, startX + 5, rowY + padding + 4);
 
         // Niveaustufen-Zellen
         levels.forEach((level, colIndex) => {
@@ -1399,17 +1377,30 @@ function exportMatrixPDF() {
             const cellText = entries.length > 0 ? entries.join('\n\n') : '—';
 
             doc.setFillColor(255, 255, 255);
-            doc.rect(x, currentY, colWidth, cellHeight, 'F');
+            doc.rect(x, rowY, colWidth, rowHeight, 'F');
+            doc.setDrawColor(180);
+            doc.setLineWidth(0.2);
+            doc.rect(x, rowY, colWidth, rowHeight, 'S');
             doc.setTextColor(70);
             doc.setFontSize(9);
             doc.setFont('helvetica', 'normal');
 
             const splitText = doc.splitTextToSize(cellText, colWidth - 8);
-            doc.text(splitText, x + 4, currentY + padding + 3);
+            doc.text(splitText, x + 4, rowY + padding + 3);
         });
 
-        currentY += cellHeight;
+        currentY += rowHeight;
     });
+
+    // === KEIN ÄUßERER RAHMEN MEHR! ===
+
+    // === SEITENZAHL ===
+    for (let i = 1; i <= pageNumber; i++) {
+        doc.setPage(i);
+        doc.setFontSize(9);
+        doc.setTextColor(150);
+        doc.text(`Seite ${i} von ${pageNumber}`, pageWidth - 30, pageHeight - 10, { align: 'right' });
+    }
 
     doc.save(`LernDashboard_Matrix_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
