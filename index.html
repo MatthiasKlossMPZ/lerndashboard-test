@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>LernDashboard Digital</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#6b46c1">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="icon-192.png" type="image/png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="prefetch" href="edit-resource.html">
+    <link rel="prefetch" href="new-resource.html">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+    .logo-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        width: 100%;
+    }
+    .logo-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+    }
+    .logo-right svg {
+        height: 80px !important;
+        width: auto;
+    }
+    .logo-title {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+    .title-main {
+        font-size: 24px;
+        font-weight: 800;
+        color: #333;
+    }
+    .title-sub {
+        font-size: 14px;
+        color: #666;
+    }
+    :root {
+        --primary: #6b46c1;
+        --primary-light: #7e5be0;
+        --danger: #e53e3e;
+        --bg: #f5f7fa;
+        --card: #ffffff;
+        --shadow: 0 1px 3px rgba(0,0,0,0.1);
+        --tool: #1e90ff;
+        --competence: #ff8c00;
+        --grade: #50c878;
+        --subject: #9b59b6;
+        --text: #333;
+        --text-light: #555;
+        --favorite: #f39c12;
+    }
+    .dark {
+        --bg: #1a1a1a;
+        --card: #2d2d2d;
+        --text: #e0e0e0;
+        --text-light: #bbbbbb;
+        --shadow: 0 1px 3px rgba(0,0,0,0.3);
+        background: #111 !important;
+        color: var(--text) !important;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0; padding: 20px;
+        background: var(--bg); color: var(--text);
+    }
+    .main { width: 100%; }
+    .content-wrapper {
+        display: flex;
+        gap: 20px;
+        margin-top: 20px;
+    }
+    .resources-container { flex: 1; min-width: 0; }
+    .sidebar {
+        width: 320px; background: var(--card); border-radius: 12px;
+        padding: 16px; box-shadow: var(--shadow); height: fit-content;
+        position: sticky; top: 20px; align-self: flex-start;
+    }
+    .sidebar h3 { margin: 0 0 16px; color: var(--primary); font-size: 16px; text-align: center; }
+    .stat-bar { margin: 12px 0; }
+    .stat-bar label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; color: var(--text-light); }
+    .bar-container { height: 10px; background: #e0e0e0; border-radius: 5px; overflow: hidden; }
+    .bar { height: 100%; background: var(--primary); border-radius: 5px; transition: width 0.4s ease; }
+    .bar-value { font-weight: bold; color: var(--primary); }
+    .filter-container { background: linear-gradient(135deg, #eef5ff, #e0edff); padding: 14px; border-radius: 12px; border: 1px solid #cce0ff; margin-bottom: 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); width: 100%; }
+    .filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+    .filter-group { display: flex; flex-direction: column; min-width: 140px; flex: 1; }
+    .filter-group label { font-size: 12px; color: #555; margin-bottom: 4px; font-weight: 600; }
+    .filter-group select { padding: 8px 10px; border: 1px solid #ccc; border-radius: 8px; background: #fff; cursor: pointer; font-size: 14px; }
+    .search-container {
+        position: relative;
+        flex: 1;
+        max-width: 280px !important;
+        min-width: 180px;
+        margin-right: 10px;
+    }
+    .search-input { width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; }
+    #suggestions { position: absolute; top: 100%; left: 0; width: 100%; background: white; border: 1px solid #ccc; max-height: 180px; overflow-y: auto; z-index: 1000; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: none; }
+    #suggestions div { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #eee; }
+    #suggestions div:hover { background: #f0f4ff; }
+    .reset-btn {
+        background: var(--primary);
+        color: white;
+        border: none;
+        padding: 8px 14px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        margin-left: 12px;
+        align-self: flex-end;
+    }
+    .export-buttons { margin: 15px 0; display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn { background: var(--primary); color: white; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: 0.2s; }
+    .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn.csv { background: #27ae60; } .btn.pdf { background: #e74c3c; } .btn.print { background: #34495e; } .btn.import { background: #f39c12; } .btn.template { background: #9b59b6; }
+    .file-input { display: none; }
+    .new-resource-btn { display: block; margin: 20px auto; padding: 14px 28px; font-size: 17px; font-weight: 700; background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 6px 16px rgba(107,70,193,0.3); transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 8px; max-width: 360px; }
+    .new-resource-btn:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(107,70,193,0.4); }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin: 16px 0; }
+    .stat-card { background: var(--card); padding: 12px; border-radius: 10px; text-align: center; box-shadow: var(--shadow); font-weight: 600; }
+    .stat-card span { display: block; font-size: 22px; color: var(--primary); margin-top: 6px; }
+    .resource-item { margin: 12px 0; padding: 16px; border: 1px solid #e0e0e0; border-radius: 12px; background: var(--card); box-shadow: var(--shadow); transition: transform 0.2s; }
+    .resource-item:hover { transform: translateY(-2px); }
+    .resource-content { margin-bottom: 12px; line-height: 1.6; font-size: 15px; }
+    .tag {
+        display: inline-block;
+        padding: 4px 10px;
+        margin: 2px 4px 2px 0;
+        border-radius: 16px;
+        font-size: 11px;
+        color: #fff;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .tag:hover {
+        opacity: 0.85;
+        transform: scale(1.05);
+    }
+    .grade-tag { background: var(--grade); }
+    .tool-tag { background: var(--tool); }
+    .competence-tag { background: var(--competence); }
+    .subject-tag { background: var(--subject); }
+    .description { margin-top: 10px; font-size: 13px; color: var(--text-light); background: #f8f9fa; padding: 8px; border-radius: 6px; border-left: 3px solid var(--primary); }
+    .action-icons { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+    .action-icon { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+    .action-icon:hover { transform: scale(1.15); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+    .action-icon svg { width: 18px; height: 18px; fill: currentColor; }
+    .edit-icon { background: #e8f5e8; color: #27ae60; } .edit-icon:hover { background: #27ae60; color: white; }
+    .delete-icon { background: #ffe8e8; color: #e74c3c; } .delete-icon:hover { background: #e74c3c; color: white; }
+    .favorite-icon { background: #fff8e1; color: #f39c12; } .favorite-icon.active { background: #f39c12; color: white; }
+    #editForm { display: none; margin-top: 25px; background: var(--card); padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 14px; }
+    .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; }
+    .form-group textarea { min-height: 90px; resize: vertical; }
+    #editForm button { margin-right: 10px; padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    #editForm button[type="submit"] { background: var(--primary); color: white; }
+    #editForm button[type="button"] { background: #95a5a6; color: white; }
+    .version-info {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        font-size: 11px;
+        color: var(--text-light);
+        background: var(--card);
+        padding: 4px 8px;
+        border-radius: 6px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        z-index: 100;
+        opacity: 0.7;
+        transition: opacity 0.2s;
+    }
+    .version-info:hover { opacity: 1; }
+
+/* ==================== MOBILE OPTIMIERUNGEN – FINAL ==================== */
+@media (max-width: 768px) {
+    body { 
+        padding: 10px; 
+        overflow-x: hidden; /* Verhindert horizontales Scrollen */
+    }
+
+    /* --- HEADER --- */
+    .logo-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 14px;
+        margin-bottom: 18px;
+    }
+    .logo-left, .logo-right {
+        width: 100%;
+        justify-content: center;
+    }
+    .logo-left svg { height: 85px !important; }
+    .logo-right svg { height: 55px !important; }
+    .title-main { font-size: 19px; }
+    .title-sub { font-size: 12.5px; }
+
+    /* --- FILTER --- */
+    .filter-container { 
+        padding: 12px; 
+        margin-bottom: 14px;
+    }
+    .filters {
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch;
+    }
+    .filter-group, .search-container {
+        min-width: 0;
+        max-width: none !important;
+        flex: 1;
+    }
+    .search-container {
+        margin: 0;
+    }
+    .reset-btn {
+        margin: 8px 0 0 0;
+        align-self: stretch;
+        padding: 10px;
+    }
+
+    /* --- CONTENT: Ressourcen VOR Sidebar --- */
+    .content-wrapper {
+        flex-direction: column !important;
+        gap: 18px;
+    }
+
+    /* --- SIDEBAR: KEIN STICKY MEHR, VOLLBREITE --- */
+    .sidebar {
+        width: 100% !important;
+        position: static !important;   /* WICHTIG: sticky deaktivieren */
+        top: auto !important;
+        padding: 14px;
+        order: 2; /* Sidebar NACH Ressourcen */
+        margin-top: 10px;
+        z-index: 1; /* Sicherstellen, dass nichts überlagert */
+    }
+    .resources-container {
+        order: 1;
+        min-width: 0;
+    }
+
+    /* --- EXPORT BUTTONS --- */
+    .export-buttons {
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: stretch;
+    }
+    .btn {
+        flex: 1 1 45%;
+        min-width: 0;
+        font-size: 13px;
+        padding: 9px 8px;
+        white-space: nowrap;
+    }
+
+    /* --- NEUE RESSOURCE BUTTON --- */
+    .new-resource-btn {
+        max-width: 100%;
+        font-size: 15.5px;
+        padding: 13px 18px;
+        margin: 18px auto;
+    }
+
+    /* --- STATS --- */
+    .stats {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+    .stat-card span { font-size: 17px; }
+
+    /* --- RESSOURCEN --- */
+    .resource-item {
+        padding: 11px;
+        font-size: 14px;
+    }
+    .action-icons { gap: 5px; }
+    .action-icon { width: 30px; height: 30px; }
+    .action-icon svg { width: 15px; height: 15px; }
+
+    /* --- VERSION INFO --- */
+    .version-info {
+        position: fixed;
+        bottom: 8px;
+        left: 8px;
+        right: 8px;
+        text-align: center;
+        font-size: 9.5px;
+        padding: 3px 6px;
+        z-index: 10;
+    }
+
+    /* --- TOUCH OPTIMIERUNG --- */
+    .btn, .action-icon, .tag, .reset-btn, .new-resource-btn, select, input {
+        min-height: 44px;
+        touch-action: manipulation;
+    }
+        .btn.import {
+        font-weight: normal !important;
+        text-align: center !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+        padding: 9px 8px;
+    }
+    .btn.import span {
+        display: block;
+        width: 100%;
+        text-align: center;
+        pointer-events: none;
+    }
+    .btn.import input[type="file"] {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        opacity: 0;
+        cursor: pointer;
+    }
+}
+
+/* Sehr kleine Bildschirme */
+@media (max-width: 380px) {
+    .stats { grid-template-columns: 1fr; }
+    .export-buttons { flex-direction: column; }
+    .btn { flex: 1 1 auto; }
+}
+    </style>
+</head>
+<body>
+    <div class="main">
+        <!-- ZWEI LOGOS + TITEL -->
+        <div class="logo-header">
+            <div class="logo-left" onclick="toggleDarkMode()">
+                <!-- APP-LOGO -->
+                <svg class="logo-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style="width: auto; height: 130px; cursor: pointer;">
+                    <defs>
+                        <linearGradient id="frameGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#8e67d6"/>
+                            <stop offset="100%" stop-color="#5e3ab0"/>
+                        </linearGradient>
+                        <linearGradient id="screenGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#f0f4ff"/>
+                            <stop offset="100%" stop-color="#d0e0ff"/>
+                        </linearGradient>
+                    </defs>
+                    <rect x="14" y="14" width="36" height="36" rx="8" fill="url(#frameGrad)" stroke="#4a2e8c" stroke-width="2"/>
+                    <rect x="16" y="16" width="32" height="32" rx="6" fill="#ffffff"/>
+                    <rect x="18" y="18" width="28" height="28" rx="4" fill="url(#screenGrad)"/>
+                    <g transform="translate(21,21)">
+                        <rect x="0" y="0" width="7" height="7" rx="1.5" fill="#4caf50"/>
+                        <circle cx="3.5" cy="2.5" r="1.5" fill="#fff"/>
+                        <path d="M2.5 4.5h2" stroke="#fff" stroke-width="1"/>
+                        <g transform="translate(9,0)">
+                            <rect x="0" y="0" width="7" height="7" rx="1.5" fill="#ff9800"/>
+                            <path d="M2 2l3 3m0-3l-3 3" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/>
+                        </g>
+                        <g transform="translate(18,0)">
+                            <rect x="0" y="0" width="7" height="7" rx="1.5" fill="#e91e63"/>
+                            <circle cx="3.5" cy="3.5" r="2" fill="#fff"/>
+                            <circle cx="4" cy="3" r="0.8" fill="#333"/>
+                        </g>
+                        <g transform="translate(0,9)">
+                            <rect x="0" y="0" width="7" height="7" rx="1.5" fill="#f44336"/>
+                            <path d="M2 5v-2l3 1v2l-3 1z" fill="#fff"/>
+                            <circle cx="4.5" cy="1.5" r="1" fill="#fff"/>
+                        </g>
+                        <g transform="translate(9,9)">
+                            <rect x="0" y="0" width="7" height="7" rx="1.5" fill="#2196f3"/>
+                            <path d="M2.5 2l2.5 1.5v-3z" fill="#fff"/>
+                        </g>
+                        <g transform="translate(18,9)">
+                            <rect x="0" y="0" width="7" height="7" rx="1.5" fill="#9c27b0"/>
+                            <path d="M1.5 2h4M1.5 3.5h4M1.5 5h2" stroke="#fff" stroke-width="0.8"/>
+                        </g>
+                        <g transform="translate(0,18)">
+                            <rect x="0" y="0" width="7" height="7" rx="1.5" fill="#3f51b5"/>
+                            <path d="M1.5 5.5h1v-2h-1zM3 5.5h1v-3h-1zM4.5 5.5h1v-1h-1z" fill="#fff"/>
+                        </g>
+                        <g transform="translate(9,18)">
+                            <rect x="0" y="0" width="7" height="7" rx="1.5" fill="#00bcd4"/>
+                            <circle cx="3.5" cy="3.5" r="2.5" stroke="#fff" stroke-width="0.8" fill="none"/>
+                            <path d="M1.5 3.5h4M3.5 1.5v4" stroke="#fff" stroke-width="0.6"/>
+                        </g>
+                        <g transform="translate(18,18)">
+                            <rect x="0" y="0" width="7" height="7" rx="1.5" fill="#eeeeee"/>
+                            <path d="M1.5 2h4M1.5 4h4" stroke="#999" stroke-width="0.8"/>
+                            <path d="M1.5 2l.7.7m-.7-.7l1.4 1.4" stroke="#4caf50" stroke-width="1"/>
+                        </g>
+                    </g>
+                    <circle cx="20" cy="20" r="3" fill="#fff" opacity="0.5"/>
+                </svg>
+                <div class="logo-title">
+                    <div class="title-main">LernDashboard</div>
+                    <div class="title-sub">Digital</div>
+                </div>
+            </div>
+            <!-- BUNDESLAND-LOGO (rechts) -->
+            <div class="logo-right">
+                <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 116.22047 61.596849" style="width: auto; height: 80px;">
+                    <defs>
+                        <style>
+                            .cls-1{fill:#005e90;}.cls-2{fill:url(#Unbenannter_Verlauf_5);}.cls-3{fill:url(#Unbenannter_Verlauf_62);}.cls-4{fill:url(#Unbenannter_Verlauf_41);}.cls-5{fill:#f2b700;}.cls-6{fill:url(#Unbenannter_Verlauf_32);}.cls-7{fill:url(#Unbenannter_Verlauf_6);}.cls-8{fill:url(#Unbenannter_Verlauf_6-2);}
+                        </style>
+                        <linearGradient id="Unbenannter_Verlauf_5" x1="77.08391" y1="22.21157" x2="113.43772" y2="30.60451" gradientUnits="userSpaceOnUse">
+                            <stop offset="0.05" stop-color="#5e9841"/><stop offset="0.4596" stop-color="#679d48"/><stop offset="0.65" stop-color="#6da14d"/><stop offset="0.95" stop-color="#5e9841"/>
+                        </linearGradient>
+                        <linearGradient id="Unbenannter_Verlauf_62" x1="77.08391" y1="22.21157" x2="113.43772" y2="30.60451" gradientUnits="userSpaceOnUse">
+                            <stop offset="0.05" stop-color="#289b38"/><stop offset="0.36963" stop-color="#319f41"/><stop offset="0.65" stop-color="#3da54c"/><stop offset="0.95" stop-color="#289b38"/>
+                        </linearGradient>
+                        <linearGradient id="Unbenannter_Verlauf_41" x1="94.87943" y1="13.29865" x2="94.87943" y2="24.93903" gradientUnits="userSpaceOnUse">
+                            <stop offset="0" stop-color="#2676a1"/><stop offset="0.00529" stop-color="#2576a1"/><stop offset="0.17354" stop-color="#116897"/><stop offset="0.33964" stop-color="#046192"/><stop offset="0.5" stop-color="#005e90"/>
+                        </linearGradient>
+                        <linearGradient id="Unbenannter_Verlauf_32" x1="90.27939" y1="14.03253" x2="90.27939" y2="0.00081" gradientUnits="userSpaceOnUse">
+                            <stop offset="0" stop-color="#6dc6e8"/><stop offset="0.19323" stop-color="#58bee5"/><stop offset="0.73219" stop-color="#21a8dc"/><stop offset="0.99375" stop-color="#0ca0d9"/>
+                        </linearGradient>
+                        <linearGradient id="Unbenannter_Verlauf_6" x1="113.26653" y1="13.74329" x2="113.26653" y2="13.73981" gradientUnits="userSpaceOnUse">
+                            <stop offset="0" stop-color="#96c5e2"/><stop offset="0.21183" stop-color="#7fb9dc"/><stop offset="0.51882" stop-color="#64aad5"/><stop offset="0.79155" stop-color="#54a1d1"/><stop offset="1" stop-color="#4e9ecf"/>
+                        </linearGradient>
+                        <linearGradient id="Unbenannter_Verlauf_6-2" x1="112.71431" y1="13.71899" x2="112.71431" y2="13.71558" xlink:href="#Unbenannter_Verlauf_6"/>
+                    </defs>
+                    <title>NEU_Zeichenfläche 1</title>
+                    <g id="tut_gut._40" data-name="tut gut. 40">
+                        <path class="cls-1" d="M53.75344,52.80545a3.9581,3.9581,0,0,1-2.40381.78858c-1.52832,0-2.90527-.84571-2.90527-3.10694V44.70438H46.76028A13.6736,13.6736,0,0,0,46.9761,43.013l1.5791-.2583.271-1.95459a11.66615,11.66615,0,0,1,1.70362-.481V43.013h3.20752a13.6736,13.6736,0,0,1-.21582,1.69141h-2.9917v5.27246c0,1.27686.6372,1.69434,1.50586,1.69434a3.2961,3.2961,0,0,0,1.93408-.68506A5.89055,5.89055,0,0,1,53.75344,52.80545Z"/>
+                        <path class="cls-1" d="M63.99856,53.52469a7.80025,7.80025,0,0,1-.7041-2.63086,3.86811,3.86811,0,0,1-3.79737,2.69971c-2.06787,0-3.312-1.333-3.312-3.77393v-6.48a14.32361,14.32361,0,0,1,2.08545-.58886v6.64062c0,1.45117.70947,2.22656,1.83789,2.22656,1.64355,0,3.10742-1.59668,3.10742-3.915v-1.4624c0-1.61963-.03125-2.77685-.05517-3.19824a10.5755,10.5755,0,0,1,2.10058-.06543c.01709.35889.04053,1.48975.04053,3.26367V49.3953a12.13883,12.13883,0,0,0,.46387,3.69482A4.53265,4.53265,0,0,1,63.99856,53.52469Z"/>
+                        <path class="cls-1" d="M74.62942,52.80545a3.95815,3.95815,0,0,1-2.40381.78858c-1.52832,0-2.90528-.84571-2.90528-3.10694V44.70438H67.63625a13.67169,13.67169,0,0,0,.21582-1.69141l1.5791-.2583.271-1.95459a11.66636,11.66636,0,0,1,1.70361-.481V43.013H74.6133a13.67169,13.67169,0,0,1-.21582,1.69141h-2.9917v5.27246c0,1.27686.63721,1.69434,1.50586,1.69434a3.296,3.296,0,0,0,1.93408-.68506A5.89051,5.89051,0,0,1,74.62942,52.80545Z"/>
+                        <path class="cls-1" d="M88.55569,51.67264c1.75.33594,2.498,1.188,2.498,2.43164,0,2.06543-2.11426,3.78516-5.418,3.78516-2.62841,0-4.54052-1.05371-4.54052-2.6499,0-1.39454,1.23925-2.30274,2.69287-2.69629a2.03468,2.03468,0,0,1-1.27149-1.814,1.89434,1.89434,0,0,1,.78711-1.51123,3.13428,3.13428,0,0,1-1.8042-2.86865c0-2.22461,2.0708-3.59863,4.50147-3.59863a5.61022,5.61022,0,0,1,1.73144.25781H91.2051a11.4867,11.4867,0,0,1-.2207,1.56445l-1.49756-.41553a3.09669,3.09669,0,0,1,.69336,1.99707c0,2.22071-2.05811,3.58448-4.49512,3.58448a5.97529,5.97529,0,0,1-1.24121-.12451.79386.79386,0,0,0-.13672.44287c0,.4375.3291.86279,1.7417,1.13427l2.50684.48145ZM89.06447,54.49c0-.47314-.3208-.82324-1.57617-1.06445l-1.96875-.37793c-1.35449.2749-2.48925.92041-2.48925,1.71582,0,.80908,1.25048,1.42285,2.89013,1.42285C87.77346,56.18631,89.06447,55.4368,89.06447,54.49Zm-5.563-8.19726A2.0449,2.0449,0,0,0,85.77785,48.157a2.165,2.165,0,0,0,2.40088-1.94629,2.05016,2.05016,0,0,0-2.271-1.87842A2.17934,2.17934,0,0,0,83.50149,46.29276Z"/>
+                        <path class="cls-1" d="M101.107,53.52469a7.80046,7.80046,0,0,1-.70411-2.63086,3.86809,3.86809,0,0,1-3.79736,2.69971c-2.06787,0-3.312-1.333-3.312-3.77393v-6.48a14.32325,14.32325,0,0,1,2.08545-.58886v6.64062c0,1.45117.70947,2.22656,1.83789,2.22656,1.64355,0,3.10742-1.59668,3.10742-3.915v-1.4624c0-1.61963-.03125-2.77685-.05518-3.19824a10.57563,10.57563,0,0,1,2.10059-.06543c.01709.35889.04053,1.48975.04053,3.26367V49.3953a12.13883,12.13883,0,0,0,.46387,3.69482A4.53265,4.53265,0,0,1,101.107,53.52469Z"/>
+                        <path class="cls-1" d="M111.73781,52.80545a3.95809,3.95809,0,0,1-2.4038.78858c-1.52832,0-2.90528-.84571-2.90528-3.10694V44.70438h-1.68408a13.67169,13.67169,0,0,0,.21582-1.69141l1.5791-.2583.271-1.95459a11.66636,11.66636,0,0,1,1.70361-.481V43.013h3.20752a13.67169,13.67169,0,0,1-.21582,1.69141h-2.9917v5.27246c0,1.27686.63721,1.69434,1.50586,1.69434a3.29608,3.29608,0,0,0,1.93408-.68506A5.89055,5.89055,0,0,1,111.73781,52.80545Z"/>
+                        <path class="cls-1" d="M113.79616,52.3787a1.31151,1.31151,0,0,1,1.28466-1.3794,1.129,1.129,0,0,1,1.13965,1.21436A1.31177,1.31177,0,0,1,114.9358,53.594,1.12982,1.12982,0,0,1,113.79616,52.3787Z"/>
+                    </g>
+                    <g id="MV_40" data-name="MV 40">
+                        <path class="cls-1" d="M70.86079.186,56.3,31.2433H50.56612L36.00536.186a.09132.09132,0,0,1,.08216-.11994h.90427A13.42714,13.42714,0,0,1,40.578.44591a6.59341,6.59341,0,0,1,3.43214,3.50857c1.51057,2.97876,9.42287,19.602,9.42287,19.602s7.91237-16.6232,9.42294-19.602A6.5933,6.5933,0,0,1,66.28805.44591,13.42772,13.42772,0,0,1,69.87429.06606h.90428A.09135.09135,0,0,1,70.86079.186Z"/>
+                        <path class="cls-1" d="M32.78247.07069h-.41792a15.44729,15.44729,0,0,0-3.88737.42444c-1.77327.625-3.05629,2.13153-5.26713,6.58515-1.48466,2.99024-5.77485,11.94025-5.777,11.94452-.00213-.00427-4.29232-8.95428-5.777-11.94452C9.44525,2.62666,8.16223,1.12013,6.389.49513A15.44716,15.44716,0,0,0,2.50159.07069H2.08368L0,31.2518H5.92717L7.39906,8.8536,15.75948,26.493h3.34718L27.46708,8.8536,28.939,31.2518h5.92717Z"/>
+                    </g>
+                    <g id="Bildzeichen_40" data-name="Bildzeichen 40">
+                        <path class="cls-2" d="M100.9129,20.95462c-5.679.31559-12.82928,2.6454-17.21232,3.37a52.42079,52.42079,0,0,1-7.24636.61441v6.24207h36.85037V21.45885a47.93751,47.93751,0,0,0-8.41788-.61591C103.67309,20.84294,102.34472,20.87528,100.9129,20.95462Z"/>
+                        <path class="cls-3" d="M100.9129,20.95462c-5.679.31559-12.82928,2.6454-17.21232,3.37a52.42079,52.42079,0,0,1-7.24636.61441v6.24207h36.85037V21.45885a47.93751,47.93751,0,0,0-8.41788-.61591C103.67309,20.84294,102.34472,20.87528,100.9129,20.95462Z"/>
+                        <path class="cls-4" d="M94.87955,13.29865c-8.53535,0-18.42531.73388-18.42531.73388V24.939a52.41512,52.41512,0,0,0,7.24635-.61445c4.383-.72454,11.53325-3.05438,17.21228-3.37,1.43183-.07935,2.76024-.11169,3.97382-.11169a47.934,47.934,0,0,1,8.41792.616V13.74329S103.72831,13.29865,94.87955,13.29865Z"/>
+                        <path class="cls-5" d="M104.10456.00061a64.43537,64.43537,0,0,0-2.6283,9.25488,39.51381,39.51381,0,0,0-.687,4.10034c6.72951.11976,12.51539.38746,12.51539.38746V0Z"/>
+                        <path class="cls-6" d="M101.47625,9.25549a64.40366,64.40366,0,0,1,2.6283-9.25407L76.45424.00081V14.03253s9.88995-.73389,18.4253-.73389c1.97325,0,3.9783.02283,5.90967.05719A39.51043,39.51043,0,0,1,101.47625,9.25549Z"/>
+                        <path class="cls-7" d="M113.30461,13.74329l-.07617-.00348Z"/>
+                        <path class="cls-8" d="M112.75442,13.719l-.08022-.00341Z"/>
+                    </g>
+                </svg>
+            </div>
+        </div>
+
+        <!-- FILTER -->
+        <div class="filter-container">
+            <div class="filters">
+                <div class="filter-group">
+                    <label>Fach</label>
+                    <select id="filterSubject"><option value="">Alle</option></select>
+                </div>
+                <div class="filter-group">
+                    <label>Klasse</label>
+                    <select id="filterGrade"><option value="">Alle</option></select>
+                </div>
+                <div class="filter-group">
+                    <label>Kompetenz</label>
+                    <select id="filterCompetence"><option value="">Alle</option></select>
+                </div>
+                <div class="filter-group">
+                    <label>Tool</label>
+                    <select id="filterTool"><option value="">Alle</option></select>
+                </div>
+                <div class="filter-group">
+                    <label>Favoriten</label>
+                    <select id="filterFavorite">
+                        <option value="">Alle</option>
+                        <option value="true">Nur Favoriten</option>
+                    </select>
+                </div>
+                <div class="search-container">
+                    <label>Thema</label>
+                    <input type="text" id="searchTopic" class="search-input" placeholder="z.B. Klimawandel">
+                    <div id="suggestions"></div>
+                </div>
+                <button class="reset-btn" onclick="resetFilters()">Reset</button>
+            </div>
+        </div>
+
+        <!-- STATISTIK -->
+        <div class="stats">
+            <div class="stat-card"><div>Gesamt</div><span id="statTotal">0</span></div>
+            <div class="stat-card"><div>Favoriten</div><span id="statFavorites">0</span></div>
+            <div class="stat-card"><div>Tools</div><span id="statTools">0</span></div>
+            <div class="stat-card"><div>Fächer</div><span id="statSubjects">0</span></div>
+        </div>
+
+        <!-- EXPORT -->
+        <div class="export-buttons">
+            <button class="btn csv" onclick="exportCSV()">CSV</button>
+            <button class="btn pdf" onclick="exportPDF()">PDF</button>
+            <button class="btn print" onclick="window.print()">Drucken</button>
+            <label class="btn import"> <input type="file" accept=".csv" class="file-input" onchange="importCSV(event)"> <span>Import</span> </label>
+            <button class="btn template" onclick="exportTemplate()">Vorlage</button>
+            <button class="btn" onclick="autoBackup()" style="background:#2ecc71; color:white;">
+    Backup jetzt
+</button>
+        </div>
+
+<button class="new-resource-btn" onclick="openNewResourcePopup()">
+    Neue Ressource
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+</button>
+
+        <!-- RESSOURCEN + SIDEBAR -->
+        <div class="content-wrapper">
+            <div class="resources-container">
+                <div id="resourcesList"></div>
+            </div>
+            <div class="sidebar">
+                <h3>Fächer-Statistik</h3>
+                <div id="statsFach"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SVG SYMBOLS -->
+    <svg style="display:none">
+        <symbol id="edit-icon" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></symbol>
+        <symbol id="delete-icon" viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></symbol>
+        <symbol id="star-icon" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></symbol>
+    </svg>
+
+    <script>
+    // === DATEN & KONFIG ===
+    let resources = JSON.parse(localStorage.getItem('resources') || '[]');
+const tools = new Set();
+resources.forEach(r => {
+    if (r.tool) {
+        const trimmed = r.tool.trim();
+        r.tool = trimmed; // Sicherstellen: immer getrimmt
+        tools.add(trimmed.toLowerCase()); // Nur für Filter klein
+    }
+});
+
+    const subjects = ["AWT", "Astronomie", "Biologie", "Chemie", "Deutsch", "Englisch", "Französisch", "Geografie", "Geschichte", "Gesellschaftskunde", "Informatik", "Italienisch", "Kunst", "Mathematik", "Musik", "Naturwissenschaften", "Physik", "Plattdeutsch", "Russisch", "Spanisch", "Sozialkunde", "Sport", "Wirtschaft"];
+    const grades = Array.from({length: 13}, (_, i) => `Klasse ${i+1}`);
+    const competences = [
+        "Suchen, Verarbeiten und Aufbewahren",
+        "Kommunizieren und Kooperieren",
+        "Produzieren und Präsentieren",
+        "Schützen und sicher Agieren",
+        "Problemlösen und Handeln",
+        "Analysieren und Reflektieren"
+    ];
+
+    // === HILFSFUNKTIONEN ===
+    function escapeJs(str) {
+        if (!str) return '';
+        return str.replace(/'/g, "\\'").replace(/"/g, "\\\"");
+    }
+
+    function setFilterAndApply(filterId, value) {
+        const select = document.getElementById(filterId);
+        if (select) {
+            select.value = value;
+            applyFilters();
+            document.querySelector('.filter-container').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    // === DARK MODE ===
+    function toggleDarkMode() {
+        document.body.classList.toggle('dark');
+        localStorage.setItem('darkMode', document.body.classList.contains('dark'));
+    }
+    if (localStorage.getItem('darkMode') === 'true') toggleDarkMode();
+
+    // === DROPDOWNS ===
+    function populateDropdowns() {
+        const addOptions = (id, options) => {
+            const select = document.getElementById(id);
+            if (select) {
+                select.innerHTML = '<option value="">Alle</option>';
+                options.forEach(opt => select.add(new Option(opt, opt)));
+            }
+        };
+        addOptions('filterSubject', subjects);
+        addOptions('filterGrade', grades);
+        addOptions('filterCompetence', competences);
+        updateToolFilter();
+    }
+
+function updateToolFilter() {
+    const s = document.getElementById('filterTool');
+    if (s) {
+        s.innerHTML = '<option value="">Alle</option>';
+        // Original-Tools aus resources holen (für korrekte Großschreibung)
+        const uniqueTools = [...new Set(resources.map(r => r.tool).filter(Boolean))];
+        uniqueTools.sort((a, b) => a.localeCompare(b, 'de', { sensitivity: 'base' })).forEach(tool => {
+            s.add(new Option(tool, tool.toLowerCase()));
+        });
+    }
+}
+
+    // === STATISTIK ===
+    function updateStats() {
+        const els = {
+            statTotal: resources.length,
+            statFavorites: resources.filter(r => r.favorite).length,
+            statTools: tools.size,
+            statSubjects: new Set(resources.map(r => r.subject)).size
+        };
+        Object.entries(els).forEach(([id, val]) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = val;
+        });
+        updateSubjectBarStats();
+    }
+
+    function updateSubjectBarStats() {
+        const count = resources.reduce((a, r) => (a[r.subject] = (a[r.subject] || 0) + 1, a), {});
+        const container = document.getElementById('statsFach');
+        if (!container) return;
+        container.innerHTML = '';
+        const max = Math.max(...Object.values(count)) || 1;
+        Object.entries(count)
+            .sort((a, b) => b[1] - a[1])
+            .forEach(([k, v]) => {
+                const div = document.createElement('div');
+                div.className = 'stat-bar';
+                div.innerHTML = `
+                    <label>${k} <span class="bar-value">${v}</span></label>
+                    <div class="bar-container">
+                        <div class="bar" style="width:${(v / max * 100)}%"></div>
+                    </div>`;
+                container.appendChild(div);
+            });
+    }
+
+    // === FILTER & ANZEIGE ===
+    function applyFilters() {
+        const f = {
+            subject: document.getElementById('filterSubject')?.value.toLowerCase() || '',
+            grade: document.getElementById('filterGrade')?.value.toLowerCase() || '',
+            competence: document.getElementById('filterCompetence')?.value.toLowerCase() || '',
+            tool: document.getElementById('filterTool')?.value.toLowerCase() || '',
+            favorite: document.getElementById('filterFavorite')?.value || '',
+            topic: document.getElementById('searchTopic')?.value.toLowerCase() || ''
+        };
+
+        const filtered = resources.filter(r =>
+            (!f.subject || r.subject.toLowerCase() === f.subject) &&
+            (!f.grade || r.grade.toLowerCase() === f.grade) &&
+            (!f.competence || r.competence.toLowerCase() === f.competence) &&
+            (!f.tool || (r.tool && r.tool.toLowerCase() === f.tool)) &&
+            (f.favorite === '' || r.favorite === (f.favorite === 'true')) &&
+            (!f.topic || r.topic.toLowerCase().includes(f.topic))
+        );
+        displayResources(filtered);
+        updateStats();
+    }
+
+    function resetFilters() {
+        ['filterSubject','filterGrade','filterCompetence','filterTool','filterFavorite'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        const search = document.getElementById('searchTopic');
+        if (search) search.value = '';
+        applyFilters();
+    }
+
+function showAlert(message, callback) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-outer';
+    modal.style.cssText = `
+        position:fixed;top:0;left:0;width:100%;height:100%;
+        background:rgba(0,0,0,0.6);display:flex;justify-content:center;
+        align-items:center;z-index:10001;
+    `;
+    modal.innerHTML = `
+        <div style="
+            background:#fff;padding:24px;border-radius:16px;max-width:400px;
+            text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.2);
+        ">
+            <p style="margin:0 0 16px;white-space:pre-line;line-height:1.5;">
+                ${message.replace(/\n/g, '<br>')}
+            </p>
+            <div style="display:flex;gap:10px;justify-content:center;">
+                <button id="alert-ok-btn" 
+                        style="background:#6b46c1;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600;">
+                    OK
+                </button>
+                ${callback ? `
+                <button id="alert-cancel-btn" 
+                        style="background:#95a5a6;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600;">
+                    Abbrechen
+                </button>` : ''}
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    const removeModal = () => modal.remove();
+
+    // Jetzt mit korrekten IDs!
+    modal.querySelector('#alert-ok-btn')?.addEventListener('click', () => {
+        removeModal();
+        if (callback) callback();
+    });
+
+    modal.querySelector('#alert-cancel-btn')?.addEventListener('click', removeModal);
+
+    // Optional: ESC zum Abbrechen
+    const escHandler = (e) => {
+        if (e.key === 'Escape') {
+            removeModal();
+            document.removeEventListener('keydown', escHandler);
+        }
+    };
+    document.addEventListener('keydown', escHandler);
+}
+
+function toggleFavorite(i) {
+    resources[i].favorite = !resources[i].favorite;
+    localStorage.setItem('resources', JSON.stringify(resources)); // JETZT DA!
+    applyFilters();
+}
+
+function displayResources(list) {
+    const c = document.getElementById('resourcesList');
+    if (!c) return;
+    c.innerHTML = '';
+    list.forEach((r, i) => {
+        // SICHERER INDEX: Vergleich aller Felder
+        const realIndex = resources.findIndex(res => 
+            res.topic === r.topic && 
+            res.subject === r.subject && 
+            res.grade === r.grade && 
+            res.competence === r.competence &&
+            (res.tool || '') === (r.tool || '') &&
+            (res.description || '') === (r.description || '')
+        );
+
+        const d = document.createElement('div');
+        d.className = 'resource-item';
+        d.dataset.index = realIndex >= 0 ? realIndex : i; // Fallback
+
+        d.innerHTML = `
+            <div class="resource-content">
+                <strong>${r.topic}</strong>
+                <span class="tag subject-tag" onclick="setFilterAndApply('filterSubject', '${escapeJs(r.subject)}')">${r.subject}</span>
+                <span class="tag grade-tag" onclick="setFilterAndApply('filterGrade', '${escapeJs(r.grade)}')">${r.grade}</span>
+                <span class="tag competence-tag" onclick="setFilterAndApply('filterCompetence', '${escapeJs(r.competence)}')">${r.competence}</span>
+               ${r.tool ? `<span class="tag tool-tag" onclick="setFilterAndApply('filterTool', '${escapeJs(r.tool.toLowerCase())}')">${escapeJs(r.tool)}</span>` : ''}
+                ${r.description ? `<div class="description">${r.description}</div>` : ''}
+                ${r.lastModified ? `<div style="font-size:11px; color:#888; margin-top:6px;">Zuletzt: ${r.lastModified}</div>` : ''}
+            </div>
+            <div class="action-icons">
+                <div class="action-icon favorite-icon ${r.favorite ? 'active' : ''}"
+                     onclick="toggleFavorite(${realIndex})">
+                    <svg><use xlink:href="#star-icon"/></svg>
+                </div>
+                <div class="action-icon edit-icon"
+                     onclick="editResource(${realIndex})">
+                    <svg><use xlink:href="#edit-icon"/></svg>
+                </div>
+                <div class="action-icon delete-icon"
+                     onclick="deleteResource(${realIndex})">
+                    <svg><use xlink:href="#delete-icon"/></svg>
+                </div>
+            </div>`;
+        c.appendChild(d);
+    });
+}
+
+    // === BEARBEITEN ===
+    function editResource(i) {
+        const r = resources[i];
+        const data = encodeURIComponent(JSON.stringify(r));
+        const url = `edit-resource.html?index=${i}&data=${data}`;
+        const popup = window.open(url, 'editResource', 'width=680,height=760,resizable=yes,scrollbars=yes');
+        if (popup) {
+            popup.focus();
+        } else {
+            alert('Popup wurde blockiert – bitte erlauben!');
+        }
+    }
+// === NEUE RESSOURCE IM POPUP ===
+function openNewResourcePopup() {
+    const url = 'new-resource.html';
+    const popup = window.open(url, 'newResource', 'width=680,height=760,resizable=yes,scrollbars=yes');
+    if (popup) {
+        popup.focus();
+    } else {
+        alert('Popup wurde blockiert – bitte erlauben!');
+    }
+}
+
+function deleteResource(i) {
+    const resource = resources[i];
+    if (!resource) return;
+
+    // 1. Animation starten – RICHTIGE ELEMENT!
+    const anim = document.getElementById('deleteAnimation');
+    anim.classList.add('delete-active');
+
+    // 2. Ton (optional)
+    try {
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBQ==');
+        audio.volume = 0.2;
+        audio.play();
+    } catch(e) {}
+
+    // 3. Nach 1,6s löschen + aufräumen
+    setTimeout(() => {
+        resources.splice(i, 1);
+        localStorage.setItem('resources', JSON.stringify(resources));
+        applyFilters();
+
+        // Animation beenden – RICHTIGE ELEMENT!
+        anim.classList.remove('delete-active');
+    }, 1600);
+}
+
+    // === AUTOCOMPLETE ===
+    const searchInput = document.getElementById('searchTopic');
+    const suggestions = document.getElementById('suggestions');
+    if (searchInput && suggestions) {
+        searchInput.oninput = e => {
+            suggestions.innerHTML = '';
+            const v = e.target.value.toLowerCase().trim();
+            if (!v) { suggestions.style.display = 'none'; return; }
+            const m = [...new Set(resources.map(r => r.topic).filter(t => t.toLowerCase().includes(v)))].slice(0, 6);
+            if (!m.length) { suggestions.style.display = 'none'; return; }
+            m.forEach(t => {
+                const d = document.createElement('div');
+                d.textContent = t;
+                d.onclick = () => { searchInput.value = t; suggestions.style.display = 'none'; applyFilters(); };
+                suggestions.appendChild(d);
+            });
+            suggestions.style.display = 'block';
+        };
+        document.addEventListener('click', e => {
+            if (!searchInput.contains(e.target) && !suggestions.contains(e.target)) {
+                suggestions.style.display = 'none';
+            }
+        });
+    }
+
+    // === CSV-IMPORT ===
+    function importCSV(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const text = e.target.result;
+            let lines = text.split(/\r\n|\n|\r/).map(l => l.trim()).filter(l => l);
+            if (lines.length < 1) { showAlert("CSV-Datei ist leer!"); return; }
+            const parsed = parseCSV(lines);
+            if (!parsed || parsed.data.length === 0) { showAlert("Keine gültigen Daten gefunden!"); return; }
+            const { header, data } = parsed;
+            const required = ['Thema', 'Unterrichtsfach', 'Klassenstufe', 'Kompetenzbereich'];
+            const missing = required.filter(col => !header.includes(col));
+            if (missing.length > 0) {
+                showAlert(`Fehlende Spalten: ${missing.join(', ')}\n\nGefundene Spalten: ${header.join(', ')}`);
+                return;
+            }
+            const previewLines = data.slice(0, 8).map(row => {
+                return `${row.Thema || ''} | ${row.Unterrichtsfach || ''} | ${row.Klassenstufe || ''} | ${row.Digitales_Hilfsmittel || ''}`;
+            }).join('\n');
+            const total = data.length;
+            if (!confirm(`Vorschau (max. 8 Zeilen):\n\n${previewLines}\n${total > 8 ? `\n... und ${total - 8} weitere` : ''}\n\nImportieren? (${total} Ressourcen)`)) return;
+            importWithProgress(data, header);
+        };
+        reader.readAsText(file, 'UTF-8');
+    }
+
+    function parseCSV(lines) {
+        const result = { header: [], data: [] };
+        let headerLine = lines[0];
+        let dataLines = lines.slice(1);
+        const headerCells = [];
+        let inQuotes = false;
+        let cell = '';
+        for (let i = 0; i < headerLine.length; i++) {
+            const char = headerLine[i];
+            if (char === '"') { inQuotes = !inQuotes; continue; }
+            if (char === ',' && !inQuotes) { headerCells.push(cell.trim()); cell = ''; } else { cell += char; }
+        }
+        headerCells.push(cell.trim());
+        result.header = headerCells;
+
+        for (let line of dataLines) {
+            const row = {};
+            let inQuotes = false;
+            let cell = '';
+            let colIndex = 0;
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"') {
+                    if (i + 1 < line.length && line[i + 1] === '"') { cell += '"'; i++; } else { inQuotes = !inQuotes; }
+                    continue;
+                }
+                if (char === ',' && !inQuotes) {
+                    const headerKey = result.header[colIndex] || `col${colIndex}`;
+                    row[normalizeHeader(headerKey)] = cell.trim();
+                    cell = ''; colIndex++;
+                } else { cell += char; }
+            }
+            const headerKey = result.header[colIndex] || `col${colIndex}`;
+            row[normalizeHeader(headerKey)] = cell.trim();
+            if (row.Thema) result.data.push(row);
+        }
+        return result;
+    }
+
+    function normalizeHeader(str) {
+        return str
+            .replace(/Digitales Hilfsmittel/g, 'Digitales_Hilfsmittel')
+            .replace(/Beschreibung/g, 'Beschreibung')
+            .replace(/[^a-zA-Z0-9_]/g, '_');
+    }
+
+    function importWithProgress(data, header) {
+        let imported = 0, skipped = 0, errors = [];
+        const modal = document.createElement('div');
+        modal.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;z-index:10000;font-family:Segoe UI,sans-serif;`;
+        modal.innerHTML = `<div style="background:#fff;padding:24px;border-radius:16px;max-width:500px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+            <h3 style="margin:0 0 16px;color:#6b46c1;">Import läuft...</h3>
+            <div style="background:#f0f0f0;height:12px;border-radius:6px;overflow:hidden;margin:16px 0;"><div id="progressBar" style="background:#6b46c1;width:0%;height:100%;transition:width 0.2s;"></div></div>
+            <p id="status" style="margin:8px 0;font-size:14px;color:#555;">0 von ${data.length}</p>
+            <p id="log" style="max-height:120px;overflow-y:auto;font-size:13px;color:#333;margin-top:12px;"></p>
+        </div>`;
+        document.body.appendChild(modal);
+        const progressBar = modal.querySelector('#progressBar');
+        const status = modal.querySelector('#status');
+        const log = modal.querySelector('#log');
+
+        const processChunk = (index) => {
+            if (index >= data.length) {
+                modal.remove();
+                const summary = `Import abgeschlossen!\n\n${imported} hinzugefügt\n${skipped} übersprungen\n${errors.length} Fehler`;
+                showAlert(summary + (errors.length > 0 ? '\n\nFehler: ' + errors.slice(0, 5).join('; ') : ''));
+                localStorage.setItem('resources', JSON.stringify(resources));
+                updateToolFilter();
+                applyFilters();
+                return;
+            }
+            const row = data[index];
+            try {
+                const newRes = {
+                    topic: (row.Thema || '').trim(),
+                    subject: (row.Unterrichtsfach || '').trim(),
+                    grade: (row.Klassenstufe || '').trim(),
+                    competence: (row.Kompetenzbereich || '').trim(),
+                    tool: (row.Digitales_Hilfsmittel || '').trim(),
+                    description: (row.Beschreibung || '').trim(),
+                    favorite: false,
+                    lastModified: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                };
+                const duplicate = resources.some(r => r.topic === newRes.topic && r.subject === newRes.subject && r.grade === newRes.grade);
+                if (duplicate) {
+                    skipped++;
+                    log.innerHTML += `<div style="color:#e67e22;">Übersprungen: Duplikat "${newRes.topic}"</div>`;
+                } else if (newRes.topic && newRes.subject && newRes.grade && newRes.competence) {
+                    resources.push(newRes);
+                    if (newRes.tool) tools.add(newRes.tool.toLowerCase());
+                    imported++;
+                } else {
+                    errors.push(`Ungültig: ${newRes.topic || 'unbekannt'}`);
+                    log.innerHTML += `<div style="color:#e74c3c;">Fehler: Unvollständig "${newRes.topic}"</div>`;
+                }
+            } catch (err) {
+                errors.push(`Zeile ${index + 2}: ${err.message}`);
+            }
+            const percent = ((index + 1) / data.length) * 100;
+            progressBar.style.width = percent + '%';
+            status.textContent = `${index + 1} von ${data.length}`;
+            log.scrollTop = log.scrollHeight;
+            setTimeout(() => processChunk(index + 1), 1);
+        };
+        processChunk(0);
+    }
+
+    function exportTemplate() {
+        const template = "Thema,Unterrichtsfach,Klassenstufe,Kompetenzbereich,Digitales Hilfsmittel,Beschreibung\nBeispiel-Thema,Mathematik,Klasse 5,Problemlösen und Handeln,GeoGebra,Beispielsatz";
+        const blob = new Blob(['\uFEFF' + template], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'beispiel-lerndashboard.csv';
+        link.click();
+    }
+
+    function exportCSV() {
+        if (resources.length === 0) { showAlert("Keine Daten!"); return; }
+        let chunkSize = 500;
+        let chunks = [];
+        for (let i = 0; i < resources.length; i += chunkSize) {
+            let chunk = resources.slice(i, i + chunkSize).map(r => {
+                return `"${(r.topic||'').replace(/"/g, '""')}","${r.subject||''}","${r.grade||''}","${r.competence||''}","${(r.tool||'').replace(/"/g, '""')}","${(r.description||'').replace(/"/g, '""')}"`;
+            }).join('\n');
+            chunks.push('Thema,Unterrichtsfach,Klassenstufe,Kompetenzbereich,Digitales Hilfsmittel,Beschreibung\n' + chunk);
+        }
+        let zip = new JSZip();
+        chunks.forEach((chunk, i) => zip.file(`ressourcen_teil_${i+1}.csv`, chunk));
+        zip.generateAsync({type: "blob"}).then(content => {
+            let link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = 'lerndashboard_ressourcen.zip';
+            link.click();
+        });
+    }
+
+    function exportPDF() {
+        const { jsPDF } = window.jspdf;
+        if (resources.length === 0) { showAlert("Keine Daten!"); return; }
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        let y = 25;
+        let pageNumber = 1;
+        doc.setFontSize(20);
+        doc.setTextColor(107, 70, 193);
+        doc.text('LernDashboard', pageWidth / 2, y, { align: 'center' });
+        y += 8;
+        doc.setFontSize(12);
+        doc.setTextColor(100);
+        doc.text('Digitale Unterrichtsideen', pageWidth / 2, y, { align: 'center' });
+        y += 15;
+        const footer = () => {
+            doc.setFontSize(9);
+            doc.setTextColor(150);
+            doc.text(`Exportiert am: ${new Date().toLocaleDateString('de-DE')}`, 15, pageHeight - 10);
+            doc.text(`Seite ${pageNumber}`, pageWidth - 30, pageHeight - 10);
+        };
+        resources.forEach((r, i) => {
+            if (y > 260) { footer(); doc.addPage(); y = 25; pageNumber++; }
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(0);
+            doc.text(`${i+1}. ${r.topic}`, 15, y);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            let x = 15;
+            doc.setTextColor(100);
+            doc.text(r.grade || '—', x, y + 6); x += 35;
+            doc.setTextColor(233, 30, 99);
+            doc.text(r.competence || '—', x, y + 6); x += 70;
+            doc.setTextColor(39, 174, 96);
+            doc.text(r.tool || '—', x, y + 6);
+            if (r.lastModified) {
+                doc.setTextColor(150);
+                doc.setFontSize(9);
+                doc.text(`Zuletzt: ${r.lastModified}`, 15, y + 11);
+            }
+            y += 20;
+        });
+        footer();
+        doc.save('LernDashboard_Ressourcen.pdf');
+    }
+        function autoBackup() {
+    const date = new Date().toISOString().slice(0,10); // z. B. 2025-11-02
+    exportCSV(); // Startet den normalen CSV-Export
+    setTimeout(() => {
+        showAlert(`Backup erstellt!\n\nDatei wird heruntergeladen:\nlerndashboard_ressourcen_${date}.zip\n\nTipp: Speichern Sie sie sicher ab!`);
+    }, 800);
+}
+// === BEARB. BESTÄTIGUNG (ohne Ton) ===
+function showEditConfirmation() {
+    const anim = document.getElementById('editAnimation');
+    anim.classList.add('edit-active');
+
+    // Nach 1,6 Sekunden automatisch ausblenden
+    setTimeout(() => {
+        anim.classList.remove('edit-active');
+    }, 1600);
+}
+        // === HINZUFÜGEN BESTÄTIGUNG ===
+function showAddConfirmation() {
+    const anim = document.getElementById('addAnimation');
+    anim.classList.add('add-active');
+    setTimeout(() => anim.classList.remove('add-active'), 1600);
+}
+    // === INIT ===
+    ['filterSubject','filterGrade','filterTool','filterCompetence','filterFavorite'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', applyFilters);
+    });
+    const searchEl = document.getElementById('searchTopic');
+    if (searchEl) searchEl.addEventListener('input', applyFilters);
+
+if (!navigator.onLine) {
+    showAlert('Offline-Modus aktiv – Änderungen werden lokal gespeichert.');
+}
+
+window.addEventListener('online', () => {
+    showAlert('Internetverbindung wiederhergestellt.');
+});
+window.addEventListener('offline', () => {
+    showAlert('Offline-Modus aktiv – Änderungen werden lokal gespeichert.');
+});
+    populateDropdowns();
+    applyFilters();
+
+// === POPUP-KOMMUNIKATION (NEU + UPDATE) ===
+window.addEventListener('message', function(event) {
+    // NEUE RESSOURCE HINZUFÜGEN
+    if (event.data?.action === 'addResource') {
+        const resource = event.data.resource;
+        if (resource && resource.topic && resource.subject && resource.grade && resource.competence) {
+            // Tool: Originalgroßschreibung beibehalten, nur für Filter klein
+            const originalTool = resource.tool?.trim();
+            if (originalTool) {
+                resource.tool = originalTool;
+                tools.add(originalTool.toLowerCase());
+            }
+            resources.push(resource);
+            localStorage.setItem('resources', JSON.stringify(resources));
+            applyFilters();
+            updateToolFilter();
+            showAddConfirmation();
+        }
+    }
+    // RESSOURCE AKTUALISIEREN
+    else if (event.data?.action === 'updateResource') {
+        const { index, resource } = event.data;
+        if (index >= 0 && index < resources.length && resource) {
+            const originalTool = resource.tool?.trim();
+            if (originalTool) {
+                resource.tool = originalTool;
+                tools.add(originalTool.toLowerCase());
+            }
+            resources[index] = resource;
+            localStorage.setItem('resources', JSON.stringify(resources));
+            applyFilters();
+            updateToolFilter();
+            showEditConfirmation();
+        }
+    }
+});
+             if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js').then(reg => {
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        newWorker?.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            showAlert('Aktualisierung wird geladen...');
+            setTimeout(() => window.location.reload(), 1200);
+          }
+        });
+      });
+    });
+  }
+ </script>  <!-- ← ENDE SCRIPT -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+     <!-- Version-Info -->
+    <div class="version-info">
+        v1.3.5 – © Matthias Kloß MPZ NB
+    </div>
+
+    <!-- === LÖSCH-ANIMATION === -->
+    <div id="deleteAnimation" style="
+        position:fixed;top:0;left:0;width:100%;height:100%;
+        background:rgba(0,0,0,0.5);backdrop-filter:blur(6px);
+        display:none;justify-content:center;align-items:center;
+        z-index:10000;
+    ">
+        <div style="
+            background:var(--card);padding:40px;border-radius:20px;text-align:center;
+            box-shadow:0 16px 48px rgba(0,0,0,0.25);
+            transform:scale(0.8);opacity:0;
+            transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1),opacity 0.4s ease;
+        ">
+            <div style="width:90px;height:90px;margin:0 auto 18px;position:relative;">
+                <svg width="90" height="90" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="44" fill="none" stroke="#e0e0e0" stroke-width="3"/>
+                    <path d="M30 50 L45 65 L70 35" fill="none" stroke="#e74c3c" stroke-width="6"
+                          stroke-linecap="round" stroke-linejoin="round"
+                          style="stroke-dasharray:100;stroke-dashoffset:100;animation:draw 0.6s ease forwards 0.3s;"/>
+                </svg>
+            </div>
+            <p style="font-size:20px;font-weight:700;color:#e74c3c;margin:0 0 6px;">
+                Gelöscht!
+            </p>
+            <p style="font-size:14px;color:var(--text-light);margin:0;">
+                Die Ressource wurde entfernt.
+            </p>
+        </div>
+    </div>
+
+    <style>
+        @keyframes draw { to { stroke-dashoffset: 0; } }
+        .delete-active { display: flex !important; }
+        .delete-active > div { transform: scale(1) !important; opacity: 1 !important; }
+        .edit-active { display: flex !important; }
+         .edit-active > div { transform: scale(1) !important; opacity: 1 !important; }
+        .add-active { display: flex !important; }
+         .add-active > div { transform: scale(1) !important; opacity: 1 !important; }
+    </style>
+<!-- === BEARBEITUNGS-BESTÄTIGUNG (ANIMATION – OHNE TON) === -->
+<div id="editAnimation" style="
+    position:fixed; top:0; left:0; width:100%; height:100%;
+    background:rgba(0,0,0,0.5); backdrop-filter:blur(6px);
+    display:none; justify-content:center; align-items:center;
+    z-index:10000;
+">
+    <div style="
+        background:var(--card); padding:40px; border-radius:20px; text-align:center;
+        box-shadow:0 16px 48px rgba(0,0,0,0.25);
+        transform:scale(0.8); opacity:0;
+        transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s ease;
+    ">
+        <div style="width:90px; height:90px; margin:0 auto 18px;">
+            <svg width="90" height="90" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="44" fill="none" stroke="#e0e0e0" stroke-width="3"/>
+                <path d="M30 50 L45 65 L70 35" fill="none" stroke="#27ae60" stroke-width="6"
+                      stroke-linecap="round" stroke-linejoin="round"
+                      style="stroke-dasharray:100; stroke-dashoffset:100; animation:draw 0.6s ease forwards 0.3s;"/>
+            </svg>
+        </div>
+        <p style="font-size:20px; font-weight:700; color:#27ae60; margin:0 0 6px;">
+            Bearbeitet!
+        </p>
+        <p style="font-size:14px; color:var(--text-light); margin:0;">
+            Die Ressource wurde aktualisiert.
+        </p>
+    </div>
+</div>
+        <!-- === HINZUFÜGEN-BESTÄTIGUNG (ANIMATION) === -->
+<div id="addAnimation" style="
+    position:fixed; top:0; left:0; width:100%; height:100%;
+    background:rgba(0,0,0,0.5); backdrop-filter:blur(6px);
+    display:none; justify-content:center; align-items:center;
+    z-index:10000;
+">
+    <div style="
+        background:var(--card); padding:40px; border-radius:20px; text-align:center;
+        box-shadow:0 16px 48px rgba(0,0,0,0.25);
+        transform:scale(0.8); opacity:0;
+        transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s ease;
+    ">
+        <div style="width:90px; height:90px; margin:0 auto 18px;">
+            <svg width="90" height="90" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="44" fill="none" stroke="#e0e0e0" stroke-width="3"/>
+                <path d="M30 50 L45 65 L70 35" fill="none" stroke="#27ae60" stroke-width="6"
+                      stroke-linecap="round" stroke-linejoin="round"
+                      style="stroke-dasharray:100; stroke-dashoffset:100; animation:draw 0.6s ease forwards 0.3s;"/>
+            </svg>
+        </div>
+        <p style="font-size:20px; font-weight:700; color:#27ae60; margin:0 0 6px;">
+            Hinzugefügt!
+        </p>
+        <p style="font-size:14px; color:var(--text-light); margin:0;">
+            Die Ressource ist im Dashboard.
+        </p>
+    </div>
+</div>
+    
+
+</body>
+</html>
