@@ -1415,7 +1415,6 @@ function exportPDF() {
             doc.addPage();
             pageNumber++;
             y = 20;
-            // Optional: Titel wiederholen
             doc.setFontSize(10);
             doc.setTextColor(150);
             doc.text('LernDashboard Digital – Fortsetzung', pageWidth / 2, y, { align: 'center' });
@@ -1423,8 +1422,9 @@ function exportPDF() {
         }
     };
 
-    // === TAGS & REST (unverändert) ===
+    // === TAG-FARBEN (erweitert um Fach) ===
     const tagColors = {
+        subject: [155, 89, 182],   // #9b59b6
         grade: [80, 200, 120],
         competence: [255, 140, 0],
         level: [0, 191, 255],
@@ -1433,6 +1433,7 @@ function exportPDF() {
 
     resources.forEach((r, i) => {
         const topic = r.topic || '—';
+        const subject = r.subject || '—';
         const grade = r.grade || '—';
         const competence = r.competence || '—';
         const level = r.level || '—';
@@ -1448,14 +1449,15 @@ function exportPDF() {
         doc.text(topicLines, startX, y);
         y += topicLines.length * lineHeight + 3;
 
-        // Tags
+        // Tags (jetzt inkl. Fach)
         let x = startX;
         const tagHeight = 5;
         const tagPadding = 2;
-        const tagGap = 7;
+        const tagGap = 6; // etwas kleiner, damit 5 Tags passen
         const textY = y - 0.7;
 
         const tags = [
+            { text: subject, type: 'subject' },
             { text: grade, type: 'grade' },
             { text: competence, type: 'competence' },
             { text: level, type: 'level' },
