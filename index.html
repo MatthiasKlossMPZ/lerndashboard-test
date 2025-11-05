@@ -184,6 +184,55 @@
     }
     .version-info:hover { opacity: 1; }
 
+/* === SCHUL-BUTTON: IDENTISCH ZUM NEUE-RESSOURCE-BUTTON (OHNE ICON) === */
+.school-btn {
+    background: linear-gradient(135deg, #9b59b6, #8e44ad) !important;
+    margin: 16px auto 8px !important;
+    max-width: 100% !important;
+    font-size: 16px !important;
+    padding: 14px 20px !important;
+    box-shadow: 0 6px 16px rgba(155, 89, 182, 0.3) !important;
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px;
+    border: none;
+    color: white;
+    font-weight: 700;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    width: 100%;
+}
+
+.school-btn:hover {
+    transform: translateY(-3px) !important;
+    box-shadow: 0 12px 28px rgba(155, 89, 182, 0.4) !important;
+}
+
+.school-btn::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    transition: left 0.7s;
+}
+
+.school-btn:hover::before {
+    left: 100%;
+}
+
+/* Wenn Schulname gesetzt → grün */
+#schoolButton[data-set="true"] {
+    background: linear-gradient(135deg, #27ae60, #2ecc71) !important;
+    box-shadow: 0 6px 16px rgba(46, 204, 113, 0.3) !important;
+}
+
+#schoolButton[data-set="true"]:hover {
+    box-shadow: 0 12px 28px rgba(46, 204, 113, 0.4) !important;
+}
+
 /* ==================== MOBILE OPTIMIERUNGEN – FINAL ==================== */
 @media (max-width: 768px) {
     body { 
@@ -252,6 +301,21 @@
         order: 1;
         min-width: 0;
     }
+    /* --- SCHULNAME-BUTTON (MOBILE) --- */
+#schoolButton {
+    font-size: 12.5px;
+    padding: 9px 10px;
+    min-height: 42px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+#schoolButton:hover {
+    box-shadow: 0 4px 10px rgba(0,0,0,0.18);
+}
+
+#schoolButton[data-set="true"]:hover {
+    box-shadow: 0 4px 10px rgba(197, 143, 224, 0.35);
+}
 
 /* === EXPORT-BUTTONS – EINHEITLICHES FARBKONZEPT === */
 .export-buttons .btn {
@@ -424,6 +488,7 @@
 .new-resource-btn:hover::before {
     left: 100%;
 }
+
 
 /* Sehr kleine Bildschirme */
 @media (max-width: 380px) {
@@ -638,12 +703,8 @@
             <div class="sidebar">
                 <h3>Fächer-Statistik</h3>
                 <div style="margin: 12px 0; text-align:center;">
-                <button id="schoolButton" class="btn" onclick="setSchoolName()"
-                    style="background:#9b59b6; font-size:13px; padding:10px 12px; width:100%;
-                   white-space: normal; word-break: break-word; line-height:1.4;
-                   display: flex; align-items: center; justify-content: center;
-                   height: auto; min-height: 44px; text-align: center;"
-                    title="Schulname festlegen">Schule einstellen</button>
+                <button id="schoolButton" class="new-resource-btn school-btn" onclick="setSchoolName()">
+                <span id="schoolButtonText">Schule einstellen</span></button>
                 </div>
                 <div id="statsFach"></div>
             </div>
@@ -711,18 +772,16 @@ resources.forEach(r => {
 function updateSchoolButton() {
     const btn = document.getElementById('schoolButton');
     if (!btn) return;
-    const name = getSchoolName();
 
+    const name = getSchoolName();
     if (name) {
         btn.textContent = name;
-        btn.style.background = '#27ae60';  // Grün – Name gesetzt!
-        btn.style.color = 'white';
         btn.title = 'Schulname ändern';
+        btn.dataset.set = 'true';
     } else {
         btn.textContent = 'Schule einstellen';
-        btn.style.background = '#9b59b6';  // Standardfarbe
-        btn.style.color = 'white';
         btn.title = 'Schulname festlegen';
+        btn.dataset.set = 'false';
     }
 }
 
