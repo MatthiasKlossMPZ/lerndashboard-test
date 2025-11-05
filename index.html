@@ -548,6 +548,11 @@
             </div>
             <div class="sidebar">
                 <h3>Fächer-Statistik</h3>
+                <div style="margin: 12px 0; text-align:center;">
+                <button class="btn" onclick="setSchoolName()" style="background:#9b59b6; font-size:13px; padding:8px 12px;">
+                Schule einstellen
+    </button>
+</div>
                 <div id="statsFach"></div>
             </div>
         </div>
@@ -605,6 +610,22 @@ resources.forEach(r => {
         localStorage.setItem('darkMode', document.body.classList.contains('dark'));
     }
     if (localStorage.getItem('darkMode') === 'true') toggleDarkMode();
+
+    // === SCHULNAME FÜR PDF ===
+    function getSchoolName() {
+    return localStorage.getItem('schoolName') || 'Deine Schule';
+}
+
+function setSchoolName() {
+    const name = prompt('Name der Schule eingeben:', getSchoolName());
+    if (name && name.trim()) {
+        localStorage.setItem('schoolName', name.trim());
+        showAlert(`Schulname gespeichert:\n\n${name.trim()}\n\nWird auf allen PDF-Exports angezeigt.`);
+    } else if (name === '') {
+        localStorage.removeItem('schoolName');
+        showAlert('Schulname entfernt – Standard: "Deine Schule"');
+    }
+}
 
     // === DROPDOWNS ===
     function populateDropdowns() {
@@ -1168,62 +1189,151 @@ function exportTemplate() {
     });
 }
 
-    function exportPDF() {
-        const { jsPDF } = window.jspdf;
-        if (resources.length === 0) { showAlert("Keine Daten!"); return; }
-        const doc = new jsPDF('p', 'mm', 'a4');
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-        let y = 25;
-        let pageNumber = 1;
-        doc.setFontSize(20);
-        doc.setTextColor(107, 70, 193);
-        doc.text('LernDashboard', pageWidth / 2, y, { align: 'center' });
-        y += 8;
-        doc.setFontSize(12);
-        doc.setTextColor(100);
-        doc.text('Digitale Unterrichtsideen', pageWidth / 2, y, { align: 'center' });
-        y += 15;
-        const footer = () => {
-            doc.setFontSize(9);
-            doc.setTextColor(150);
-            doc.text(`Exportiert am: ${new Date().toLocaleDateString('de-DE')}`, 15, pageHeight - 10);
-            doc.text(`Seite ${pageNumber}`, pageWidth - 30, pageHeight - 10);
-        };
-        resources.forEach((r, i) => {
-            if (y > 260) { footer(); doc.addPage(); y = 25; pageNumber++; }
-            doc.setFontSize(11);
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(0);
-            doc.text(`${i+1}. ${r.topic}`, 15, y);
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(10);
-            let x = 15;
-            doc.setTextColor(100);
-            doc.text(r.grade || '—', x, y + 6); x += 35;
-            doc.setTextColor(233, 30, 99);
-            doc.text(r.competence || '—', x, y + 6); x += 70;
-            doc.setTextColor(0, 191, 255);
-            doc.text(r.level || '—', x, y + 6); x += 50;  // Neues Feld in PDF
-            doc.setTextColor(39, 174, 96);
-            doc.text(r.tool || '—', x, y + 6);
-            if (r.lastModified) {
-                doc.setTextColor(150);
-                doc.setFontSize(9);
-                doc.text(`Zuletzt: ${r.lastModified}`, 15, y + 11);
-            }
-            y += 20;
-        });
-        footer();
-        doc.save('LernDashboard_Ressourcen.pdf');
+function exportPDF() {
+    const { jsPDF } = window.jspdf;
+    if (resources.length === 0) {
+        showAlert("Keine Daten zum Exportieren!");
+        return;
     }
-        function autoBackup() {
-    const date = new Date().toISOString().slice(0,10); // z. B. 2025-11-02
-    exportCSV(); // Startet den normalen CSV-Export
-    setTimeout(() => {
-        showAlert(`Backup erstellt!\n\nDatei wird heruntergeladen:\nlerndashboard_ressourcen_${date}.zip\n\nTipp: Speichern Sie sie sicher ab!`);
-    }, 800);
+
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    let y = 30;
+    const lineHeight = 6;
+    const startX = 15;
+    let pageNumber = 1;
+
+    // === SCHULNAME OBEN RECHTS (nur auf Seite 1) ===
+    const schoolName = getSchoolName();
+    doc.setFontSize(11);
+    doc.setTextColor(80, 80, 80);
+    doc.setFont('helvetica', 'italic');
+    doc.text(schoolName, pageWidth - 15, 15, { align: 'right' });
+
+    // === TITEL ===
+    doc.setFontSize(20);
+    doc.setTextColor(107, 70, 193);
+    doc.setFont('helvetica', 'bold');
+    doc.text('LernDashboard Digital', pageWidth / 2, y, { align: 'center' });
+    y += 8;
+
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Digitale Unterrichtsideen', pageWidth / 2, y, { align: 'center' });
+    y += 10;
+
+    doc.setFontSize(9);
+    doc.setTextColor(120);
+    doc.text(`Exportiert am: ${new Date().toLocaleDateString('de-DE')}`, pageWidth - 15, y, { align: 'right' });
+    y += 12;
+
+    // === SEITENUMBRUCH ===
+    const addPageIfNeeded = (neededHeight) => {
+        if (y + neededHeight > pageHeight - 25) {
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            doc.text(`Seite ${pageNumber}`, pageWidth - 20, pageHeight - 10);
+            doc.addPage();
+            pageNumber++;
+            y = 20;
+            // Optional: Titel wiederholen
+            doc.setFontSize(10);
+            doc.setTextColor(150);
+            doc.text('LernDashboard Digital – Fortsetzung', pageWidth / 2, y, { align: 'center' });
+            y += 8;
+        }
+    };
+
+    // === TAGS & REST (unverändert) ===
+    const tagColors = {
+        grade: [80, 200, 120],
+        competence: [255, 140, 0],
+        level: [0, 191, 255],
+        tool: [30, 144, 255]
+    };
+
+    resources.forEach((r, i) => {
+        const topic = r.topic || '—';
+        const grade = r.grade || '—';
+        const competence = r.competence || '—';
+        const level = r.level || '—';
+        const tool = r.tool || '—';
+        const description = r.description || '';
+
+        // Thema
+        doc.setFontSize(11);
+        doc.setTextColor(0);
+        doc.setFont('helvetica', 'bold');
+        const topicLines = doc.splitTextToSize(`${i + 1}. ${topic}`, pageWidth - 30);
+        addPageIfNeeded(topicLines.length * lineHeight + 5);
+        doc.text(topicLines, startX, y);
+        y += topicLines.length * lineHeight + 3;
+
+        // Tags
+        let x = startX;
+        const tagHeight = 5;
+        const tagPadding = 2;
+        const tagGap = 7;
+        const textY = y - 0.7;
+
+        const tags = [
+            { text: grade, type: 'grade' },
+            { text: competence, type: 'competence' },
+            { text: level, type: 'level' },
+            { text: tool, type: 'tool' }
+        ];
+
+        doc.setFontSize(8.5);
+        doc.setFont('helvetica', 'normal');
+
+        tags.forEach(tag => {
+            if (tag.text === '—') return;
+            const color = tagColors[tag.type];
+            const textWidth = doc.getTextWidth(tag.text);
+            const tagWidth = textWidth + 2 * tagPadding;
+            doc.setFillColor(...color);
+            doc.roundedRect(x, y - tagHeight + 0.8, tagWidth, tagHeight, 1.8, 1.8, 'F');
+            doc.setTextColor(255);
+            doc.text(tag.text, x + tagPadding, textY);
+            x += tagWidth + tagGap;
+        });
+
+        y += 6;
+
+        // Beschreibung
+        if (description) {
+            doc.setFontSize(9);
+            doc.setTextColor(70);
+            doc.setFont('helvetica', 'italic');
+            const descLines = doc.splitTextToSize(description, pageWidth - 30);
+            const descHeight = descLines.length * lineHeight;
+            addPageIfNeeded(descHeight + 8);
+            doc.setFillColor(248, 250, 252);
+            doc.rect(startX - 1, y - 1.5, pageWidth - 30 + 2, descHeight + 3, 'F');
+            doc.text(descLines, startX, y + lineHeight - 1);
+            y += descHeight + 6;
+        } else {
+            y += 4;
+        }
+
+        // Trennlinie
+        doc.setDrawColor(220);
+        doc.setLineWidth(0.3);
+        doc.line(startX, y, pageWidth - 15, y);
+        y += 8;
+    });
+
+    // === FUSSZEILE ===
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text(`Seite ${pageNumber}`, pageWidth - 20, pageHeight - 10);
+
+    // === SPEICHERN ===
+    doc.save(`LernDashboard_Ressourcen_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
+
 // === BEARB. BESTÄTIGUNG (ohne Ton) ===
 function showEditConfirmation() {
     const anim = document.getElementById('editAnimation');
