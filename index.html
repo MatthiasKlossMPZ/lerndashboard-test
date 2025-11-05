@@ -549,10 +549,12 @@
             <div class="sidebar">
                 <h3>Fächer-Statistik</h3>
                 <div style="margin: 12px 0; text-align:center;">
-                <button id="schoolButton" class="btn" onclick="setSchoolName()" 
-                style="background:#9b59b6; font-size:13px; padding:8px 12px; width:100%; 
-                   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
-                title="Schulname festlegen">Schule einstellen</button>
+                <button id="schoolButton" class="btn" onclick="setSchoolName()"
+                style="background:#9b59b6; font-size:13px; padding:8px 12px; width:100%;
+                   white-space: normal; word-break: break-word; line-height:1.4;
+                   text-align: left; height: auto; min-height: 44px;"
+                title="Schulname ändern">Schule einstellen
+                </button>
                 </div>
                 <div id="statsFach"></div>
             </div>
@@ -620,12 +622,11 @@ resources.forEach(r => {
 function updateSchoolButton() {
     const btn = document.getElementById('schoolButton');
     if (!btn) return;
-
     const name = getSchoolName();
     if (name) {
-        btn.textContent = name;  // NUR der Name
-        btn.style.background = '#8e44ad'; // Dunkler, wenn gesetzt
-        btn.title = 'Schulname ändern';   // Tooltip für Klarheit
+        btn.textContent = name;  // Vollständiger Name
+        btn.style.background = '#8e44ad';
+        btn.title = name;
     } else {
         btn.textContent = 'Schule einstellen';
         btn.style.background = '#9b59b6';
