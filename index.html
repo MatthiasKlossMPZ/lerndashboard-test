@@ -123,7 +123,6 @@
     .export-buttons { margin: 15px 0; display: flex; gap: 10px; flex-wrap: wrap; }
     .btn { background: var(--primary); color: white; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: 0.2s; }
     .btn:hover { opacity: 0.9; transform: translateY(-1px); }
-    .btn.csv { background: #27ae60; } .btn.pdf { background: #e74c3c; } .btn.print { background: #34495e; } .btn.import { background: #f39c12; } .btn.template { background: #9b59b6; }
     .file-input { display: none; }
     .new-resource-btn { display: block; margin: 20px auto; padding: 14px 28px; font-size: 17px; font-weight: 700; background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 6px 16px rgba(107,70,193,0.3); transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 8px; max-width: 360px; }
     .new-resource-btn:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(107,70,193,0.4); }
@@ -255,6 +254,46 @@
     }
 
     /* --- EXPORT BUTTONS --- */
+    /* === EXPORT-BUTTONS – EINHEITLICHES FARBKONZEPT === */
+.export-buttons .btn {
+    font-weight: 600;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    position: relative;
+    overflow: hidden;
+}
+
+/* 1. ERSTELLEN / EXPORT → Violett (Markenfarbe) */
+.btn.csv,
+.btn.pdf,
+.btn.matrix {
+    background: var(--primary);
+    color: white;
+}
+
+/* 2. IMPORT / TOOL → Blau (sicher, technisch) */
+.btn.import,
+.btn.template,
+.btn[onclick="autoBackup()"] {
+    background: #2980b9;
+    color: white;
+}
+
+/* 3. DRUCKEN → Dunkel (neutral) */
+.btn.print {
+    background: #2c3e50;
+    color: white;
+}
+
+/* Hover-Effekte */
+.export-buttons .btn:hover {
+    opacity: 0.92;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
     .export-buttons {
         flex-wrap: wrap;
         gap: 8px;
