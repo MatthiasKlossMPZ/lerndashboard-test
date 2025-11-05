@@ -549,10 +549,11 @@
             <div class="sidebar">
                 <h3>Fächer-Statistik</h3>
                 <div style="margin: 12px 0; text-align:center;">
-                <button class="btn" onclick="setSchoolName()" style="background:#9b59b6; font-size:13px; padding:8px 12px;">
-                Schule einstellen
-    </button>
-</div>
+                <button id="schoolButton" class="btn" onclick="setSchoolName()" 
+                style="background:#9b59b6; font-size:13px; padding:8px 12px; width:100%; 
+                   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+                title="Schulname festlegen">Schule einstellen</button>
+                </div>
                 <div id="statsFach"></div>
             </div>
         </div>
@@ -611,21 +612,45 @@ resources.forEach(r => {
     }
     if (localStorage.getItem('darkMode') === 'true') toggleDarkMode();
 
-    // === SCHULNAME FÜR PDF ===
     function getSchoolName() {
-    return localStorage.getItem('schoolName') || 'Deine Schule';
+    return localStorage.getItem('schoolName');
+}
+
+// === SCHULNAME FÜR PDF + BUTTON ===
+function updateSchoolButton() {
+    const btn = document.getElementById('schoolButton');
+    if (!btn) return;
+
+    const name = getSchoolName();
+    if (name) {
+        btn.textContent = name;  // NUR der Name
+        btn.style.background = '#8e44ad'; // Dunkler, wenn gesetzt
+        btn.title = 'Schulname ändern';   // Tooltip für Klarheit
+    } else {
+        btn.textContent = 'Schule einstellen';
+        btn.style.background = '#9b59b6';
+        btn.title = 'Schulname festlegen';
+    }
 }
 
 function setSchoolName() {
-    const name = prompt('Name der Schule eingeben:', getSchoolName());
-    if (name && name.trim()) {
-        localStorage.setItem('schoolName', name.trim());
-        showAlert(`Schulname gespeichert:\n\n${name.trim()}\n\nWird auf allen PDF-Exports angezeigt.`);
-    } else if (name === '') {
+    const current = getSchoolName();
+    const name = prompt('Name der Schule eingeben:', current || '');
+    
+    if (name === null) return; // Abgebrochen
+    if (name.trim() === '') {
         localStorage.removeItem('schoolName');
-        showAlert('Schulname entfernt – Standard: "Deine Schule"');
+        showAlert('Schulname entfernt.');
+    } else {
+        localStorage.setItem('schoolName', name.trim());
+        showAlert(`Schulname gespeichert:\n\n${name.trim()}`);
     }
+    
+    updateSchoolButton(); // Button sofort aktualisieren
 }
+
+// Beim Laden der Seite: Button aktualisieren
+document.addEventListener('DOMContentLoaded', updateSchoolButton);
 
     // === DROPDOWNS ===
     function populateDropdowns() {
@@ -1205,9 +1230,9 @@ function exportPDF() {
     let pageNumber = 1;
 
     // === SCHULNAME OBEN RECHTS (nur auf Seite 1) ===
-    const schoolName = getSchoolName();
+    const schoolName = getSchoolName() || 'Deine Schule';
     doc.setFontSize(11);
-    doc.setTextColor(80, 80, 80);
+    doc.setTextColor(schoolName === 'Deine Schule' ? 150 : 80);
     doc.setFont('helvetica', 'italic');
     doc.text(schoolName, pageWidth - 15, 15, { align: 'right' });
 
