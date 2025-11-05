@@ -1725,7 +1725,7 @@ function exportMatrixPDF() {
         doc.setDrawColor(120);
         doc.setLineWidth(0.5);
         doc.line(leftMargin, y + h, pageWidth - rightMargin, y + h);
-        return y + h + 3;
+        return y + h;
     };
 
     // === HEADER ===
@@ -1742,23 +1742,29 @@ const LINE_HEIGHT_LEVEL = LEVEL_FONT_SIZE * LINE_HEIGHT_FACTOR * 0.3528;
 const PADDING_FACTOR = 0.25;
 
 competences.forEach((comp) => {
-    // 1. Kompetenz-Text
+    // === HÖHEN & ZEILEN BERECHNEN (mit KORREKTEN FONTS) ===
+    // Kompetenz
+    doc.setFontSize(COMP_FONT_SIZE);
+    doc.setFont('helvetica', 'bold');
     const compText = comp;
     const compLines = doc.splitTextToSize(compText, compColWidth - 8);
     const compTextHeight = compLines.length * LINE_HEIGHT_COMP;
 
-    // 2. Level-Texte (mit \n\n!)
+    // Levels (inkl. leere mit '—')
     let maxLevelTextHeight = 0;
+    doc.setFontSize(LEVEL_FONT_SIZE);
+    doc.setFont('helvetica', 'normal');
+    const levelLines = {};  // Speichern für Zeichnung
     levels.forEach(l => {
         const entries = matrix[comp][l];
-        if (entries.length === 0) return;
-        const text = entries.join('\n\n');
-        const lines = doc.splitTextToSize(text, levelColWidth - 8);
+        const rawText = entries.length > 0 ? entries.join('\n\n') : '—';
+        const lines = doc.splitTextToSize(rawText, levelColWidth - 8);
+        levelLines[l] = lines;
         const height = lines.length * LINE_HEIGHT_LEVEL;
         if (height > maxLevelTextHeight) maxLevelTextHeight = height;
     });
 
-    // 3. Maximale Höhe in der Zeile
+    // Maximale Zeilenhöhe
     const maxTextHeight = Math.max(compTextHeight, maxLevelTextHeight);
     const rowHeight = Math.max(MIN_ROW_HEIGHT, maxTextHeight + 4);  // +4 mm Rand
 
@@ -1779,37 +1785,28 @@ competences.forEach((comp) => {
     const rowY = currentY;
     let x = leftMargin;
 
-    // === KOMPETENZ ZELLE ===
+    // === KOMPETENZ-ZELLE (zentriert) ===
     doc.setFillColor(248, 249, 255);
     doc.rect(x, rowY, compColWidth, rowHeight, 'F');
     doc.setTextColor(0);
     doc.setFontSize(COMP_FONT_SIZE);
     doc.setFont('helvetica', 'bold');
-
-    const compPadding = (rowHeight - compTextHeight) * PADDING_FACTOR;
-    const compStartY = rowY + compPadding + LINE_HEIGHT_COMP * 0.8;
+    const compStartY = rowY + (rowHeight - compTextHeight) / 2 + LINE_HEIGHT_COMP * 0.8;
     doc.text(compLines, x + 4, compStartY);
-
     drawLine(x + compColWidth, rowY, x + compColWidth, rowY + rowHeight);
     x += compColWidth;
 
-    // === LEVEL ZELLEN ===
+    // === LEVEL-ZELLEN (zentriert) ===
     levels.forEach((lvl, j) => {
-        const entries = matrix[comp][lvl];
-        const rawText = entries.length > 0 ? entries.join('\n\n') : '—';
         doc.setFillColor(255, 255, 255);
         doc.rect(x, rowY, levelColWidth, rowHeight, 'F');
         doc.setTextColor(60);
         doc.setFontSize(LEVEL_FONT_SIZE);
         doc.setFont('helvetica', 'normal');
-
-        const lines = doc.splitTextToSize(rawText, levelColWidth - 8);
+        const lines = levelLines[lvl];  // Bereits gespeicherte Zeilen!
         const textHeight = lines.length * LINE_HEIGHT_LEVEL;
-        const padding = (rowHeight - textHeight) * PADDING_FACTOR;
-        const startY = rowY + padding + LINE_HEIGHT_LEVEL * 0.8;
-
+        const startY = rowY + (rowHeight - textHeight) / 2 + LINE_HEIGHT_LEVEL * 0.8;
         doc.text(lines, x + 4, startY);
-
         if (j < 4) {
             drawLine(x + levelColWidth, rowY, x + levelColWidth, rowY + rowHeight);
         }
@@ -1958,6 +1955,34 @@ function exportMatrixCSV() {
          .edit-active > div { transform: scale(1) !important; opacity: 1 !important; }
         .add-active { display: flex !important; }
          .add-active > div { transform: scale(1) !important; opacity: 1 !important; }
+    /* === TABELLEN: KEINE LÜCKEN ZWISCHEN ZELLEN === */
+table, th, td {
+    border-collapse: collapse !important;
+    border-spacing: 0 !important;
+    border: none !important;
+}
+
+th {
+    background: #6b46c1 !important;
+    color: white !important;
+    padding: 14px 16px !important;
+    font-weight: 600;
+    text-align: left;
+    font-size: 15px;
+}
+
+td {
+    background: #f8f9fa !important;
+    padding: 12px 16px !important;
+    vertical-align: top;
+    border-bottom: 1px solid #ddd !important;
+}
+
+/* Optional: Letzte Zeile ohne unteren Rand */
+tr:last-child td {
+    border-bottom: none !important;
+}
+
     </style>
 <!-- === BEARBEITUNGS-BESTÄTIGUNG (ANIMATION – OHNE TON) === -->
 <div id="editAnimation" style="
