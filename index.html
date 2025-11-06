@@ -11,6 +11,7 @@
     <link rel="prefetch" href="edit-resource.html">
     <link rel="prefetch" href="new-resource.html">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
     .logo-header {
         display: flex;
@@ -684,6 +685,8 @@
             <button class="btn pdf" onclick="exportPDF()">PDF</button>
             <button class="btn matrix" onclick="exportMatrixCSV()" style="background:#e67e22;">Matrix (CSV)</button>
             <button class="btn matrix" onclick="exportMatrixPDF()" style="background:#9c27b0; color:white;">Matrix (PDF)</button>
+            <button class="btn matrix" onclick="exportMatrixExcel()" style="background:#27ae60; color:white; border:2px solid #1e7e34;">
+            Matrix (Excel)</button>            
             <button class="btn print" onclick="window.print()">Drucken</button>
             <label class="btn import"> <input type="file" accept=".csv" class="file-input" onchange="importCSV(event)"> <span>Import</span> </label>
             <button class="btn template" onclick="exportTemplate()">Vorlage</button>
@@ -1911,6 +1914,166 @@ function exportMatrixCSV() {
     link.download = `LernDashboard_Matrix_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
 }
+function exportMatrixExcel() {
+    const subjectFilter = document.getElementById('filterSubject')?.value?.trim() || '';
+    const gradeFilter = document.getElementById('filterGrade')?.value?.trim() || '';
+    const toolFilter = document.getElementById('filterTool')?.value?.trim().toLowerCase() || '';
+
+    const subjectText = subjectFilter ? subjectFilter : 'Alle Fächer';
+    const gradeText = gradeFilter ? gradeFilter : 'Alle Klassen';
+    const toolText = toolFilter ? ` | Tool: ${toolFilter}` : '';
+    const title = `${subjectText} | ${gradeText}${toolText}`;
+
+    const competences = [
+        "Suchen, Verarbeiten und Aufbewahren",
+        "Kommunizieren und Kooperieren",
+        "Produzieren und Präsentieren",
+        "Schützen und sicher Agieren",
+        "Problemlösen und Handeln",
+        "Analysieren und Reflektieren"
+    ];
+    const levels = ["Niveaustufe 1", "Niveaustufe 2", "Niveaustufe 3", "Niveaustufe 4", "Niveaustufe 5"];
+
+    // === FARBCODES (wie in PDF) ===
+    const levelColors = {
+        "Niveaustufe 1": "8BC34A",
+        "Niveaustufe 2": "4CAF50",
+        "Niveaustufe 3": "FFC107",
+        "Niveaustufe 4": "FF9800",
+        "Niveaustufe 5": "F44336"
+    };
+
+    // === MATRIX AUFBAUEN ===
+    const matrix = {};
+    competences.forEach(c => {
+        matrix[c] = {};
+        levels.forEach(l => matrix[c][l] = []);
+    });
+
+    resources.forEach(r => {
+        const subject = r.subject?.trim();
+        const grade = r.grade?.trim();
+        const tool = r.tool?.trim().toLowerCase();
+        const comp = r.competence?.trim();
+        const level = r.level?.trim();
+        const topic = r.topic?.trim();
+
+        if (!comp || !level || !topic) return;
+
+        const matchesSubject = !subjectFilter || subject === subjectFilter;
+        const matchesGrade = !gradeFilter || grade === gradeFilter;
+        const matchesTool = !toolFilter || tool === toolFilter;
+
+        if (matchesSubject && matchesGrade && matchesTool) {
+            const entry = `${topic}\nKlasse ${grade}${r.tool ? ` – ${r.tool}` : ''}`;
+            matrix[comp][level].push(entry);
+        }
+    });
+
+    // === EXCEL-TABELLE: Matrix-Layout (6 Zeilen + 1 Header) ===
+    const excelData = [];
+
+    // Titelzeile
+    excelData.push([title]);
+    excelData.push([]); // Leerzeile
+
+    // Header: Kompetenz + 5 Niveaustufen
+    const headerRow = ["Kompetenz", ...levels];
+    excelData.push(headerRow);
+
+    // Datenzeilen: Eine pro Kompetenz
+    competences.forEach(comp => {
+        const row = [comp];
+        levels.forEach(lvl => {
+            const entries = matrix[comp][lvl];
+            row.push(entries.length > 0 ? entries.join('\n\n') : '—');
+        });
+        excelData.push(row);
+    });
+
+    // === Workbook ===
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(excelData);
+
+    // === SPALTENBREITEN ===
+    ws['!cols'] = [
+        { wch: 32 }, // Kompetenz
+        { wch: 18 }, // Niveaustufe 1
+        { wch: 18 }, // Niveaustufe 2
+        { wch: 18 }, // Niveaustufe 3
+        { wch: 18 }, // Niveaustufe 4
+        { wch: 18 }  // Niveaustufe 5
+    ];
+
+    // === STYLING ===
+    const range = XLSX.utils.decode_range(ws['!ref']);
+
+    // Titel (Zeile 0)
+    const titleCell = ws[XLSX.utils.encode_cell({ r: 0, c: 0 })];
+    if (titleCell) {
+        titleCell.s = {
+            font: { bold: true, sz: 14, color: { rgb: "6B46C1" } },
+            alignment: { horizontal: "center", vertical: "center" }
+        };
+    }
+    // Zusammenführen: Titel über alle Spalten
+    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }];
+
+    // Header (Zeile 2)
+    for (let c = 0; c <= 5; c++) {
+        const cellAddr = XLSX.utils.encode_cell({ r: 2, c });
+        const cell = ws[cellAddr];
+        if (cell) {
+            if (c === 0) {
+                // Kompetenz-Spalte: Lila
+                cell.s = {
+                    font: { bold: true, color: { rgb: "FFFFFF" } },
+                    fill: { fgColor: { rgb: "6B46C1" } },
+                    alignment: { horizontal: "center", vertical: "center", wrapText: true }
+                };
+            } else {
+                // Niveaustufen: Farben wie in PDF
+                const level = levels[c - 1];
+                cell.s = {
+                    font: { bold: true, color: { rgb: "FFFFFF" } },
+                    fill: { fgColor: { rgb: levelColors[level] } },
+                    alignment: { horizontal: "center", vertical: "center", wrapText: true }
+                };
+            }
+        }
+    }
+
+    // Datenzeilen (Zeilen 3–8): Niveaustufen farbig
+    for (let r = 3; r <= 8; r++) {
+        for (let c = 1; c <= 5; c++) {
+            const cellAddr = XLSX.utils.encode_cell({ r, c });
+            const cell = ws[cellAddr];
+            if (cell) {
+                const level = levels[c - 1];
+                const isEmpty = cell.v === '—';
+                cell.s = {
+                    fill: { fgColor: { rgb: isEmpty ? "FFFFFF" : levelColors[level] } },
+                    font: { color: { rgb: isEmpty ? "999999" : "000000" }, italic: isEmpty },
+                    alignment: { horizontal: "left", vertical: "top", wrapText: true }
+                };
+            }
+        }
+        // Kompetenz-Spalte: Hintergrund hell
+        const compCell = ws[XLSX.utils.encode_cell({ r, c: 0 })];
+        if (compCell) {
+            compCell.s = {
+                fill: { fgColor: { rgb: "F8F9FF" } },
+                font: { bold: true },
+                alignment: { horizontal: "left", vertical: "top", wrapText: true }
+            };
+        }
+    }
+
+    // === Sheet + Export ===
+    XLSX.utils.book_append_sheet(wb, ws, "LernMatrix");
+    const today = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `LernDashboard_Matrix_${today}.xlsx`);
+}
  </script>  <!-- ← ENDE SCRIPT -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
@@ -2044,7 +2207,6 @@ tr:last-child td {
         </p>
     </div>
 </div>
-    
 
 </body>
 </html>
