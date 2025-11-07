@@ -1290,94 +1290,43 @@ function normalizeHeader(str) {
         .replace(/Unterrichtsfach/g, 'Unterrichtsfach')
         .replace(/[^a-zA-Z0-9_ÄÖÜäöüß]/g, '_'); // Sonderzeichen → _
 }
-// === IMPORT MIT FORTSCHRITT ===
-function importWithProgress(data) {
-    let imported = 0, skipped = 0, errors = [];
-    const modal = document.createElement('div');
-    modal.style.cssText = `
-        position:fixed;top:0;left:0;width:100%;height:100%;
-        background:rgba(0,0,0,0.7);display:flex;justify-content:center;align-items:center;
-        z-index:10000;font-family:Segoe UI,sans-serif;
-    `;
-    modal.innerHTML = `
-        <div style="background:#fff;padding:24px;border-radius:16px;max-width:500px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
-            <h3 style="margin:0 0 16px;color:#6b46c1;">Import läuft...</h3>
-            <div style="background:#f0f0f0;height:12px;border-radius:6px;overflow:hidden;margin:16px 0;">
-                <div id="progressBar" style="background:#6b46c1;width:0%;height:100%;transition:width 0.2s;"></div>
-            </div>
-            <p id="status" style="margin:8px 0;font-size:14px;color:#555;">0 von ${data.length}</p>
-            <p id="log" style="max-height:120px;overflow-y:auto;font-size:13px;color:#333;margin-top:12px;"></p>
-        </div>
-    `;
-    document.body.appendChild(modal);
-
-    const progressBar = modal.querySelector('#progressBar');
-    const status = modal.querySelector('#status');
-    const log = modal.querySelector('#log');
-
-    const processChunk = (index) => {
-        if (index >= data.length) {
-            modal.remove();
-            const summary = `Import abgeschlossen!\n\n` +
-                `${imported} hinzugefügt\n` +
-                `${skipped} übersprungen (Duplikat)\n` +
-                `${errors.length} Fehler`;
-            showAlert(summary + (errors.length > 0 ? `\n\nBeispiele:\n${errors.slice(0, 3).join('\n')}` : ''));
-            localStorage.setItem('resources', JSON.stringify(resources));
-            updateToolFilter();
-            applyFilters();
+// === GLOBAL: importCSV für onchange ===
+window.importCSV = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const text = e.target.result;
+        const lines = text.split(/\r\n|\n|\r/).map(l => l.trim()).filter(l => l);
+        if (lines.length === 0) {
+            showAlert("Die CSV-Datei ist leer!");
             return;
         }
-
-        const row = data[index];
-        try {
-            const newRes = {
-                topic: row.Thema?.trim() || '',
-                subject: row.Unterrichtsfach?.trim() || '',
-                grade: row.Klassenstufe?.trim() || '',
-                competence: row.Kompetenzbereich?.trim() || '',
-                level: row.Niveaustufe?.trim() || '',
-                tool: row.Digitales_Hilfsmittel?.trim() || '',
-                description: row.Beschreibung?.trim() || '',
-                favorite: false,
-                lastModified: new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-            };
-
-            // Pflichtfelder prüfen
-            if (!newRes.topic || !newRes.subject || !newRes.grade || !newRes.competence) {
-                errors.push(`Zeile ${index + 2}: Fehlende Pflichtdaten`);
-                log.innerHTML += `<div style="color:#e74c3c;">Fehler: Unvollständig "${newRes.topic}"</div>`;
-            }
-            // Duplikat prüfen (Thema + Fach + Klasse + Niveaustufe)
-            else if (resources.some(r =>
-                r.topic === newRes.topic &&
-                r.subject === newRes.subject &&
-                r.grade === newRes.grade &&
-                r.level === newRes.level
-            )) {
-                skipped++;
-                log.innerHTML += `<div style="color:#e67e22;">Übersprungen: Duplikat "${newRes.topic}"</div>`;
-            }
-            else {
-                resources.push(newRes);
-                if (newRes.tool) tools.add(newRes.tool.toLowerCase());
-                imported++;
-            }
-        } catch (err) {
-            errors.push(`Zeile ${index + 2}: ${err.message}`);
-            log.innerHTML += `<div style="color:#e74c3c;">Fehler: ${err.message}</div>`;
+        const parsed = parseCSV(lines);
+        if (!parsed || parsed.data.length === 0) {
+            showAlert("Keine gültigen Daten in der CSV gefunden!");
+            return;
         }
-
-        const percent = ((index + 1) / data.length) * 100;
-        progressBar.style.width = percent + '%';
-        status.textContent = `${index + 1} von ${data.length}`;
-        log.scrollTop = log.scrollHeight;
-
-        setTimeout(() => processChunk(index + 1), 1);
+        const { header, data } = parsed;
+        const required = ['Thema', 'Unterrichtsfach', 'Klassenstufe', 'Kompetenzbereich'];
+        const missing = required.filter(col => !header.includes(col));
+        if (missing.length > 0) {
+            showAlert(
+                `Fehlende Pflichtspalten: ${missing.join(', ')}\n\n` +
+                `Gefundene Spalten: ${header.join(', ')}\n\n` +
+                `Tipp: Verwende die Vorlage!`
+            );
+            return;
+        }
+        const previewLines = data.slice(0, 8).map(row =>
+            `${row.Thema || ''} | ${row.Unterrichtsfach || ''} | ${row.Klassenstufe || ''} | ${row.Kompetenzbereich || ''}`
+        ).join('\n');
+        const total = data.length;
+        if (!confirm(`Vorschau (max. 8 Zeilen):\n\n${previewLines}\n${total > 8 ? `\n... und ${total - 8} weitere` : ''}\n\nImportieren? (${total} Ressourcen)`)) return;
+        importWithProgress(data);
     };
-
-    processChunk(0);
-}
+    reader.readAsText(file, 'UTF-8');
+};
 
 function exportTemplate() {
     const template = [
