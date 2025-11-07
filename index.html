@@ -1180,56 +1180,6 @@ function deleteResource(i) {
             }
         });
     }
-
-    // === CSV-IMPORT (KORRIGIERT & VERBESSERT) ===
-function importCSV(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const text = e.target.result;
-        const lines = text.split(/\r\n|\n|\r/).map(l => l.trim()).filter(l => l);
-        if (lines.length === 0) {
-            showAlert("Die CSV-Datei ist leer!");
-            return;
-        }
-
-        const parsed = parseCSV(lines);
-        if (!parsed || parsed.data.length === 0) {
-            showAlert("Keine gültigen Daten in der CSV gefunden!");
-            return;
-        }
-
-        const { header, data } = parsed;
-
-        // === PRÜFEN: Mindestens die 4 Pflichtfelder vorhanden? ===
-        const required = ['Thema', 'Unterrichtsfach', 'Klassenstufe', 'Kompetenzbereich'];
-        const missing = required.filter(col => !header.includes(col));
-        if (missing.length > 0) {
-            showAlert(
-                `Fehlende Pflichtspalten: ${missing.join(', ')}\n\n` +
-                `Gefundene Spalten: ${header.join(', ')}\n\n` +
-                `Tipp: Verwende die Vorlage (Button "Vorlage")!`
-            );
-            return;
-        }
-
-        // === VORSCHAU ===
-        const previewLines = data.slice(0, 8).map(row => 
-            `${row.Thema || ''} | ${row.Unterrichtsfach || ''} | ${row.Klassenstufe || ''} | ${row.Kompetenzbereich || ''} | ${row.Niveaustufe || ''} | ${row.Digitales_Hilfsmittel || ''}`
-        ).join('\n');
-
-        const total = data.length;
-        if (!confirm(
-            `Vorschau (max. 8 Zeilen):\n\n${previewLines}\n${total > 8 ? `\n... und ${total - 8} weitere` : ''}\n\n` +
-            `Importieren? (${total} Ressourcen)`
-        )) return;
-
-        importWithProgress(data);
-    };
-    reader.readAsText(file, 'UTF-8');
-}
 // === CSV-PARSER (ROBUST & KORREKT) ===
 function parseCSV(lines) {
     const result = { header: [], data: [] };
@@ -2243,7 +2193,7 @@ async function checkForAppUpdate() {
 
         if (latestVersion !== CURRENT_VERSION) {
             localStorage.setItem(PENDING_UPDATE_KEY, latestVersion);
-            showUpdateBanner(latestVersion);
+            showUpdateBanner(latestVersion);  
         }
 
         localStorage.setItem(LAST_CHECK_KEY, now.toString());
@@ -2369,7 +2319,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Optional: Prüfe auch bei Fokus (wenn App im Hintergrund war)
     window.addEventListener('focus', checkForAppUpdate);
 });
-// --- NUR EINMAL style ERSTELLEN ---
+// === EINMALIGE ANIMATIONEN ===
 if (!document.getElementById('app-animations')) {
     const style = document.createElement('style');
     style.id = 'app-animations';
@@ -2381,19 +2331,7 @@ if (!document.getElementById('app-animations')) {
         }
     `;
     document.head.appendChild(style);
-}
-// Animation für Banner
-if (!document.getElementById('update-animations')) {
-    const style = document.createElement('style');
-    style.id = 'update-animations';
-    style.textContent = `
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-    `;
-    document.head.appendChild(style);
-}        
+} 
  </script>  <!-- ← ENDE SCRIPT -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
