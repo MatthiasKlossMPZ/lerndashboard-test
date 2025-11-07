@@ -8,8 +8,6 @@ const urlsToCache = [
   'manifest.json',
   'icon-192.png',
   'icon-512.png',
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
 ];
 
 // INSTALL: Cache alles – mit Fehlerbehandlung
