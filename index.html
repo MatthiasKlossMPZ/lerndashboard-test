@@ -1532,7 +1532,7 @@ window.addEventListener('afterprint', () => {
     document.body.style.cursor = 'default';
 });
 
- // Nur bei HTTP/HTTPS aktivieren (nicht bei file://)
+// Nur bei HTTP/HTTPS aktivieren (nicht bei file://)
 if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
     navigator.serviceWorker.register('service-worker.js').then(reg => {
         reg.addEventListener('updatefound', () => {
@@ -1540,7 +1540,6 @@ if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.p
             newWorker?.addEventListener('statechange', () => {
                 if (newServiceWorker.state === 'installed' && navigator.serviceWorker.controller) {
                     showUpdateReady();
-                    }
                 }
             });
         });
@@ -2337,7 +2336,7 @@ if (!document.getElementById('app-animations')) {
 
      <!-- Version-Info -->
     <div class="version-info">
-        v1.4.2 – © Matthias Kloß MPZ NB
+        v1.4.3 – © Matthias Kloß MPZ NB
     </div>
 
     <!-- === LÖSCH-ANIMATION === -->
