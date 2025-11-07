@@ -2235,13 +2235,19 @@ function showUpdateBanner(version) {
 
     // Button: Update jetzt
     banner.querySelector('#updateNowBtn').onclick = () => {
-        banner.style.display = 'none';  // Banner verstecken
-        if (newServiceWorker) {
-            newServiceWorker.postMessage({ action: 'skipWaiting' });
-        } else {
-            location.reload();
-        }
-    };
+    // Banner verstecken
+    banner.style.display = 'none';
+    
+    // skipWaiting senden
+    if (newServiceWorker) {
+        newServiceWorker.postMessage({ action: 'skipWaiting' });
+    }
+
+    // Reload nach 300ms (wartet auf skipWaiting)
+    setTimeout(() => {
+        window.location.reload();
+    }, 300);
+};
 
     // Banner 5 Sekunden sichtbar halten
     setTimeout(() => {
@@ -2316,8 +2322,9 @@ function registerUpdateListener() {
 
         // Prüfe bei jedem Start
         navigator.serviceWorker.addEventListener('controllerchange', () => {
-            localStorage.removeItem(PENDING_UPDATE_KEY);
-            window.location.reload();
+        localStorage.removeItem(PENDING_UPDATE_KEY);
+        // Warten auf Klick – KEIN automatisches Reload!
+        console.log('Update bereit – warte auf Klick im Banner');
         });
     }
 }
@@ -2348,7 +2355,7 @@ if (!document.getElementById('app-animations')) {
 
      <!-- Version-Info -->
     <div class="version-info">
-        v1.4.5 – © Matthias Kloß MPZ NB
+        v1.4.6 – © Matthias Kloß MPZ NB
     </div>
 
     <!-- === LÖSCH-ANIMATION === -->
