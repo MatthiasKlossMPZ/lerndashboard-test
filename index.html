@@ -1361,8 +1361,9 @@ function exportTemplate() {
 }
 
 function exportCSV() {
-    if (resources.length === 0) {
-        showAlert("Keine Daten zum Exportieren!");
+    const filteredResources = getFilteredResources();
+    if (filteredResources.length === 0) {
+        showAlert("Keine passenden Ressourcen für den Export!\nTipp: Filter zurücksetzen oder Daten prüfen.");
         return;
     }
 
@@ -1371,7 +1372,7 @@ function exportCSV() {
         'Niveaustufe', 'Digitales_Hilfsmittel', 'Beschreibung'
     ];
 
-    const csvContent = resources.map(r => [
+    const csvContent = filteredResources.map(r => [
         `"${(r.topic || '').replace(/"/g, '""')}"`,
         `"${(r.subject || '')}"`,
         `"${(r.grade || '')}"`,
@@ -1387,7 +1388,7 @@ function exportCSV() {
     const blob = new Blob([`\uFEFF${fullCsv}`], { type: 'text/csv;charset=utf-8;' });
 
     // Für kleine Files: Direkt download (schneller, ohne Zip)
-    if (resources.length <= 500) {
+    if (filteredResources.length <= 500) {
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
         link.download = `LernDashboard_Ressourcen_${new Date().toISOString().slice(0, 10)}.csv`;
@@ -1407,8 +1408,9 @@ function exportCSV() {
 }
 
 function exportPDF() {
-    if (resources.length === 0) {
-        showAlert("Keine Daten zum Exportieren!");
+    const filteredResources = getFilteredResources();
+    if (filteredResources.length === 0) {
+        showAlert("Keine passenden Ressourcen für den Export!\nTipp: Filter zurücksetzen oder Daten prüfen.");
         return;
     }
 
@@ -1430,11 +1432,18 @@ function exportPDF() {
     doc.setFont('helvetica', 'italic');
     doc.text(schoolName, pageWidth - 15, 15, { align: 'right' });
 
-    // === TITEL ===
+    // === TITEL (mit Filter-Info) ===
+    const subjectFilter = document.getElementById('filterSubject')?.value?.trim() || '';
+    const gradeFilter = document.getElementById('filterGrade')?.value?.trim() || '';
+    let filterInfo = '';
+    if (subjectFilter) filterInfo += `${subjectFilter} `;
+    if (gradeFilter) filterInfo += `| ${gradeFilter} `;
+    if (filterInfo) filterInfo = ` (Filter: ${filterInfo.trim()})`;
+
     doc.setFontSize(20);
     doc.setTextColor(107, 70, 193);
     doc.setFont('helvetica', 'bold');
-    doc.text('LernDashboard Digital', pageWidth / 2, y, { align: 'center' });
+    doc.text(`LernDashboard Digital${filterInfo}`, pageWidth / 2, y, { align: 'center' });
     y += 8;
 
     doc.setFontSize(11);
@@ -1473,7 +1482,8 @@ function exportPDF() {
         tool: [30, 144, 255]
     };
 
-    resources.forEach((r, i) => {
+    // Verwende gefilterte Ressourcen
+    filteredResources.forEach((r, i) => {
         const topic = r.topic || '—';
         const subject = r.subject || '—';
         const grade = r.grade || '—';
@@ -1554,7 +1564,6 @@ function exportPDF() {
     // === SPEICHERN ===
     doc.save(`LernDashboard_Ressourcen_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
-
 // === BEARB. BESTÄTIGUNG (ohne Ton) ===
 function showEditConfirmation() {
     const anim = document.getElementById('editAnimation');
@@ -2055,6 +2064,10 @@ function exportMatrixExcel() {
     XLSX.utils.book_append_sheet(wb, ws, "LernMatrix");
     const today = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(wb, `LernDashboard_Matrix_${today}.xlsx`);
+}
+function autoBackup() {
+    exportCSV();  // Nutzt die bestehende Export-Funktion
+    showAlert("Backup als CSV erstellt!");
 }
  </script>  <!-- ← ENDE SCRIPT -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
