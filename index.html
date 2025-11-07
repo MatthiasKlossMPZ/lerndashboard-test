@@ -2203,7 +2203,6 @@ async function checkForAppUpdate() {
 
 // === UPDATE BANNER – KLICKBAR & 10 SEKUNDEN ===
 function showUpdateBanner(version) {
-    // Verhindere doppeltes Banner
     if (document.getElementById('updateBanner')) return;
 
     const banner = document.createElement('div');
@@ -2212,7 +2211,7 @@ function showUpdateBanner(version) {
         position: fixed !important;
         top: 20px !important;
         right: 20px !important;
-        z-index: 2147483647 !important; /* Max z-index */
+        z-index: 2147483647 !important;
         background: linear-gradient(135deg, #27ae60, #2ecc71);
         color: white;
         padding: 16px 24px;
@@ -2257,27 +2256,23 @@ function showUpdateBanner(version) {
         ">×</button>
     `;
 
-    // Banner anhängen
     document.body.appendChild(banner);
 
     // --- KLICK-HANDLER ---
-    const updateBtn = banner.querySelector('#updateNowBtn');
-    const closeBtn = banner.querySelector('#closeBannerBtn');
-
-    updateBtn.onclick = (e) => {
-        e.stopPropagation();
+    banner.querySelector('#updateNowBtn').onclick = () => {
         banner.style.opacity = '0';
         banner.style.transition = 'opacity 0.3s ease';
+        
+        if (newServiceWorker) {
+            newServiceWorker.postMessage({ action: 'skipWaiting' });
+        }
+
         setTimeout(() => {
-            if (newServiceWorker) {
-                newServiceWorker.postMessage({ action: 'skipWaiting' });
-            }
-            setTimeout(() => window.location.reload(), 300);
-        }, 300);
+            window.location.reload();
+        }, 500);
     };
 
-    closeBtn.onclick = (e) => {
-        e.stopPropagation();
+    banner.querySelector('#closeBannerBtn').onclick = () => {
         banner.style.opacity = '0';
         banner.style.transition = 'opacity 0.3s ease';
         setTimeout(() => banner.remove(), 300);
@@ -2285,8 +2280,8 @@ function showUpdateBanner(version) {
 
     // --- 10 SEKUNDEN TIMEOUT ---
     setTimeout(() => {
-        if (document.getElementById('updateBanner')) {
-            const b = document.getElementById('updateBanner');
+        const b = document.getElementById('updateBanner');
+        if (b) {
             b.style.opacity = '0';
             b.style.transition = 'opacity 0.5s ease';
             setTimeout(() => b.remove(), 500);
@@ -2358,10 +2353,8 @@ function registerUpdateListener() {
         // Prüfe bei jedem Start
             navigator.serviceWorker.addEventListener('controllerchange', () => {
             localStorage.removeItem(PENDING_UPDATE_KEY);
-            // Nur reloaden, wenn Banner weg ist
-            if (!document.getElementById('updateBanner')) {
-            window.location.reload();
-            }
+            // Warten auf Klick – KEIN Reload!
+            console.log('Update bereit – warte auf Klick');
         });
     }
 }
