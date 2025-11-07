@@ -2199,13 +2199,6 @@ function autoBackup() {
     }, 300);  // ← Hier früher: 300ms statt 1000ms
 }
 
-// === ANIMATIONS-KEYFRAME (einmalig einfügen, falls noch nicht da) ===
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes draw { to { stroke-dashoffset: 0; } }
-`;
-document.head.appendChild(style);
-
 // Hilfsfunktion: HTML escapen (sicherer für Inhalte)
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -2391,16 +2384,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Optional: Prüfe auch bei Fokus (wenn App im Hintergrund war)
     window.addEventListener('focus', checkForAppUpdate);
 });
-
-// CSS Animation
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideIn {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-    }
-`;
-document.head.appendChild(style);
+// --- NUR EINMAL style ERSTELLEN ---
+if (!document.getElementById('app-animations')) {
+    const style = document.createElement('style');
+    style.id = 'app-animations';
+    style.textContent = `
+        @keyframes draw { to { stroke-dashoffset: 0; } }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    `;
+    document.head.appendChild(style);
+}
  </script>  <!-- ← ENDE SCRIPT -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
