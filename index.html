@@ -497,6 +497,23 @@
     .export-buttons { flex-direction: column; }
     .btn { flex: 1 1 auto; }
 }
+/* Filter aktiv: blasses Rot + Akzent OHNE Verschiebung */
+.filter-container.active {
+    background: linear-gradient(135deg, #fff5f5, #ffeaea) !important;
+    box-shadow: 0 2px 8px rgba(255, 0, 0, 0.08) !important;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.filter-container.active::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: rgba(255, 0, 0, 0.4);
+    pointer-events: none; /* damit Klicks durchgehen */
+}
     </style>
 </head>
 <body>
@@ -893,6 +910,29 @@ function updateToolFilter() {
     displayResources(filtered);
     updateStats();
 }
+// === FILTER-HIGHLIGHT: Färbe .filter-container bei aktivem Filter ===
+function updateFilterHighlight() {
+    const container = document.querySelector('.filter-container');
+    if (!container) return;
+
+    const selects = container.querySelectorAll('select');
+    const search = container.querySelector('#searchTopic');
+    const isActive = Array.from(selects).some(s => s.value && s.value !== '') ||
+                     (search && search.value.trim() !== '');
+
+    container.classList.toggle('active', isActive);
+}
+
+// Wird bei jedem Filterwechsel aufgerufen
+const originalApplyFilters = applyFilters;
+window.applyFilters = function() {
+    originalApplyFilters();
+    updateFilterHighlight();
+};
+
+// Beim Laden prüfen
+document.addEventListener('DOMContentLoaded', updateFilterHighlight);
+
 // === HILFSFUNKTION: Gefilterte Ressourcen zurückgeben (ohne Anzeige) ===
 function getFilteredResources() {
     const f = {
