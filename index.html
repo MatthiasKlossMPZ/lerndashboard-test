@@ -1588,9 +1588,9 @@ if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.p
         reg.addEventListener('updatefound', () => {
             const newWorker = reg.installing;
             newWorker?.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    showAlert('Aktualisierung wird geladen...');
-                    setTimeout(() => window.location.reload(), 1200);
+                if (newServiceWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    showUpdateReady();
+                    }
                 }
             });
         });
@@ -2297,6 +2297,47 @@ function showUpdateBanner(version) {
     };
 }
 
+// === UPDATE-BANNER MIT "JETZT INSTALLIEREN" ===
+function showUpdateReady() {
+    if (document.getElementById('updateReadyBanner')) return;
+
+    const banner = document.createElement('div');
+    banner.id = 'updateReadyBanner';
+    banner.style.cssText = `
+        position: fixed; top: 20px; right: 20px; z-index: 9999;
+        background: linear-gradient(135deg, #27ae60, #2ecc71); color: white;
+        padding: 16px 24px; border-radius: 16px; box-shadow: 0 8px 32px rgba(46,204,113,0.4);
+        font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 14px;
+        max-width: 380px; animation: slideIn 0.5s ease;
+    `;
+    banner.innerHTML = `
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+        <div>
+            <strong>Update verfügbar!</strong><br>
+            <span style="font-weight: normal; font-size: 13px;">Neue Version ist bereit</span>
+        </div>
+        <button id="installUpdateBtn" style="
+            background: white; color: #27ae60; border: none; border-radius: 10px;
+            padding: 8px 16px; font-weight: 600; cursor: pointer; font-size: 14px;
+        ">Jetzt installieren</button>
+        <button onclick="this.parentElement.remove()" style="
+            background: none; border: none; color: rgba(255,255,255,0.8);
+            font-size: 20px; cursor: pointer; margin-left: 8px;
+        ">×</button>
+    `;
+    document.body.appendChild(banner);
+
+    banner.querySelector('#installUpdateBtn').onclick = () => {
+        if (newServiceWorker) {
+            newServiceWorker.postMessage({ action: 'skipWaiting' });
+        } else {
+            location.reload();
+        }
+    };
+}
+        
 // Service Worker Update-Handling
 function registerUpdateListener() {
     if ('serviceWorker' in navigator) {
@@ -2346,6 +2387,18 @@ if (!document.getElementById('app-animations')) {
     `;
     document.head.appendChild(style);
 }
+// Animation für Banner
+if (!document.getElementById('update-animations')) {
+    const style = document.createElement('style');
+    style.id = 'update-animations';
+    style.textContent = `
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    `;
+    document.head.appendChild(style);
+}        
  </script>  <!-- ← ENDE SCRIPT -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
