@@ -517,6 +517,10 @@
     </style>
 </head>
 <body>
+<!-- DRUCK-FOOTER: Schulname (unsichtbar) -->
+<div id="printSchoolName" style="position: fixed; bottom: 0; left: 0; font-size: 9pt; color: #666; display: none;">
+    Schule: <span id="printSchoolNameText"></span>
+</div>
 <div style="background: #ff4444; color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 18px; position: fixed; top: 0; left: 0; width: 100%; z-index: 9999; box-shadow: 0 2px 10px rgba(0,0,0,0.3);">
   TESTVERSION – nur für internen Gebrauch! (Diese Änderungen sind noch nicht live)
 </div>
@@ -722,7 +726,7 @@
             <div class="export-group horizontal">
                 <h4 class="export-group-title">Datenmanagement</h4>
                 <div class="btn-row">
-                    <button class="btn print" onclick="window.print()" 
+                    <button class="btn print" onclick="printOptimized()"
                             title="Druckt die aktuelle Ansicht (unabhängig von Filtern)">Drucken</button>
                     <label class="btn import" title="Importiert neue Ressourcen aus einer CSV-Datei">
                         <input type="file" accept=".csv" class="file-input" onchange="importCSV(event)">
@@ -2202,6 +2206,75 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
+// Hilfsfunktion: HTML escapen (sicherer für Inhalte)
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function printOptimized() {
+    // 1. Schulname setzen
+    const schoolName = localStorage.getItem('schoolName') || 'Deine Schule';
+    const printSchoolEl = document.getElementById('printSchoolNameText');
+    if (printSchoolEl) {
+        printSchoolEl.textContent = schoolName;
+    }
+
+    // 2. Gefilterte Ressourcen holen (deine bestehende Funktion!)
+    const filtered = getFilteredResources();
+    if (filtered.length === 0) {
+        showAlert('Keine Daten zum Drucken!\nTipp: Filter zurücksetzen oder Daten prüfen.');
+        return;
+    }
+
+    // 3. Tabelle generieren
+    let tableHtml = `
+        <div style="margin-bottom: 20mm;">
+            <h2 style="color: #6b46c1; text-align: center; margin-bottom: 10mm;">
+                LernDashboard Digital – Gefilterte Ressourcen
+            </h2>
+            <p style="text-align: center; color: #666; font-size: 10pt; margin-bottom: 15mm;">
+                Exportiert am: ${new Date().toLocaleDateString('de-DE')}
+            </p>
+            <table style="width:100%; border-collapse: collapse; font-size: 10pt;">
+                <thead>
+                    <tr style="background: #6b46c1; color: white;">
+                        <th style="padding: 8px; text-align: left;">Thema</th>
+                        <th style="padding: 8px; text-align: left;">Fach</th>
+                        <th style="padding: 8px; text-align: left;">Klasse</th>
+                        <th style="padding: 8px; text-align: left;">Kompetenz</th>
+                        <th style="padding: 8px; text-align: left;">Niveau</th>
+                        <th style="padding: 8px; text-align: left;">Tool</th>
+                        <th style="padding: 8px; text-align: left;">Beschreibung</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+    
+    filtered.forEach(r => {
+        tableHtml += `
+            <tr style="border-bottom: 1px solid #ddd;">
+                <td style="padding: 8px; vertical-align: top;">${escapeHtml(r.topic || '')}</td>
+                <td style="padding: 8px; vertical-align: top;">${escapeHtml(r.subject || '')}</td>
+                <td style="padding: 8px; vertical-align: top;">${escapeHtml(r.grade || '')}</td>
+                <td style="padding: 8px; vertical-align: top;">${escapeHtml(r.competence || '')}</td>
+                <td style="padding: 8px; vertical-align: top;">${escapeHtml(r.level || '')}</td>
+                <td style="padding: 8px; vertical-align: top;">${escapeHtml(r.tool || '')}</td>
+                <td style="padding: 8px; vertical-align: top; max-width: 200px;">${escapeHtml(r.description || '')}</td>
+            </tr>`;
+    });
+    
+    tableHtml += `</tbody></table></div>`;
+
+    // 4. Inhalt temporär ersetzen
+    const container = document.querySelector('.resources-container');
+    const originalContent = container.innerHTML;
+    container.innerHTML = tableHtml;
+
+    // 5. Drucken und zurücksetzen
+    window.print();
+    setTimeout(() => { container.innerHTML = originalContent; }, 500);
+}
  </script>  <!-- ← ENDE SCRIPT -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
@@ -2393,6 +2466,66 @@ tr:last-child td {
     .btn[title]:active::after,
     .btn[title]:active::before {
         display: block;
+    }
+}
+@media print {
+    body {
+        background: white !important;
+        color: black !important;
+        font-size: 10pt !important;
+        margin: 0 !important;
+    }
+
+    /* Verstecke unnötige Elemente */
+    .logo-header, .filter-container, .export-buttons, .new-resource-btn, 
+    .sidebar, .version-info, #deleteAnimation, #editAnimation, #addAnimation,
+    .action-icons, .test-banner, div[style*="background: #ff4444"] {  /* Banner verstecken */
+        display: none !important;
+    }
+
+    /* Ressourcen-Container optimieren */
+    .content-wrapper { display: block !important; }
+    .resources-container { width: 100% !important; margin: 0 !important; padding: 0 !important; }
+    .resource-item { border: 1px solid #ddd !important; page-break-inside: avoid !important; margin-bottom: 10mm !important; }
+    .tag { background: #eee !important; color: black !important; }
+    .description { background: none !important; border-left: 3px solid #000 !important; }
+
+    /* Schulname sichtbar machen – mit Fallback */
+    #printSchoolName {
+        display: block !important;
+        position: running(schoolFooter) !important;  /* Für Browser, die es unterstützen (z. B. Firefox) */
+        font-size: 9pt !important;
+        color: #666 !important;
+    }
+
+    /* @page Regeln */
+    @page {
+        size: A4 portrait;
+        margin: 20mm 15mm 25mm 15mm;  /* Mehr Platz unten für Footer */
+        @top-center {
+            content: "LernDashboard Digital - Seite " counter(page) " / " counter(pages);
+            font-size: 9pt;
+            color: #666;
+        }
+        @bottom-left {
+            content: element(schoolFooter);  /* Verknüpft mit running(schoolFooter) */
+            font-size: 9pt;
+            color: #666;
+        }
+        @bottom-right {
+            content: "Exportiert am: " env(date);
+            font-size: 9pt;
+            color: #666;
+        }
+    }
+
+    /* Fallback für Browser ohne running-Support (z. B. Chrome): Fixed-Position */
+    @supports not (position: running(schoolFooter)) {
+        #printSchoolName {
+            position: fixed !important;
+            bottom: 10mm !important;
+            left: 15mm !important;
+        }
     }
 }
 
