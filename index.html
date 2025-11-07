@@ -2203,6 +2203,7 @@ async function checkForAppUpdate() {
 
 // === UPDATE BANNER – KLICKBAR & 10 SEKUNDEN ===
 function showUpdateBanner(version) {
+    // Verhindere doppeltes Banner
     if (document.getElementById('updateBanner')) return;
 
     const banner = document.createElement('div');
@@ -2232,37 +2233,26 @@ function showUpdateBanner(version) {
         </svg>
         <div>
             <strong>Update verfügbar!</strong><br>
-            <span style="font-weight: normal; font-size: 13px;">v${version} – Neue Version ist bereit</span>
+            <span style="font-weight: normal; font-size: 13px;">v${version}</span>
         </div>
         <button id="updateNowBtn" style="
-            background: white;
-            color: #27ae60;
-            border: none;
-            border-radius: 10px;
-            padding: 8px 16px;
-            font-weight: 600;
-            cursor: pointer;
-            font-size: 14px;
-            pointer-events: auto !important;
+            background: white; color: #27ae60; border: none; border-radius: 10px;
+            padding: 8px 16px; font-weight: 600; cursor: pointer; font-size: 14px;
         ">Jetzt aktualisieren</button>
-        <button id="closeBannerBtn" style="
-            background: none;
-            border: none;
-            color: rgba(255,255,255,0.8);
-            font-size: 20px;
-            cursor: pointer;
-            margin-left: 8px;
-            pointer-events: auto !important;
+        <button id="closeBtn" style="
+            background: none; border: none; color: white; font-size: 20px;
+            cursor: pointer; margin-left: 8px;
         ">×</button>
     `;
 
     document.body.appendChild(banner);
 
-    // --- KLICK-HANDLER ---
+    // --- NUR HIER: skipWaiting + Reload ---
     banner.querySelector('#updateNowBtn').onclick = () => {
         banner.style.opacity = '0';
         banner.style.transition = 'opacity 0.3s ease';
-        
+
+        // NUR HIER skipWaiting!
         if (newServiceWorker) {
             newServiceWorker.postMessage({ action: 'skipWaiting' });
         }
@@ -2272,13 +2262,14 @@ function showUpdateBanner(version) {
         }, 500);
     };
 
-    banner.querySelector('#closeBannerBtn').onclick = () => {
+    // Schließen
+    banner.querySelector('#closeBtn').onclick = () => {
         banner.style.opacity = '0';
         banner.style.transition = 'opacity 0.3s ease';
         setTimeout(() => banner.remove(), 300);
     };
 
-    // --- 10 SEKUNDEN TIMEOUT ---
+    // 15 Sekunden Timeout (extra lang für dich!)
     setTimeout(() => {
         const b = document.getElementById('updateBanner');
         if (b) {
@@ -2286,9 +2277,9 @@ function showUpdateBanner(version) {
             b.style.transition = 'opacity 0.5s ease';
             setTimeout(() => b.remove(), 500);
         }
-    }, 10000);
+    }, 15000);  // 15 Sekunden!
 }
-
+        
 // === UPDATE-BANNER MIT "JETZT INSTALLIEREN" ===
 function showUpdateReady() {
     if (document.getElementById('updateReadyBanner')) return;
@@ -2321,13 +2312,18 @@ function showUpdateReady() {
     `;
     document.body.appendChild(banner);
 
-    banner.querySelector('#installUpdateBtn').onclick = () => {
-        if (newServiceWorker) {
-            newServiceWorker.postMessage({ action: 'skipWaiting' });
-        } else {
-            location.reload();
-        }
-    };
+banner.querySelector('#updateNowBtn').onclick = () => {
+    banner.style.opacity = '0';
+    banner.style.transition = 'opacity 0.3s ease';
+    
+    if (newServiceWorker) {
+        newServiceWorker.postMessage({ action: 'skipWaiting' });
+    }
+
+    setTimeout(() => {
+        window.location.reload();
+    }, 500);
+};
 }
         
 // Service Worker Update-Handling
@@ -2352,10 +2348,9 @@ function registerUpdateListener() {
 
         // Prüfe bei jedem Start
             navigator.serviceWorker.addEventListener('controllerchange', () => {
-            localStorage.removeItem(PENDING_UPDATE_KEY);
-            // Warten auf Klick – KEIN Reload!
-            console.log('Update bereit – warte auf Klick');
-        });
+    localStorage.removeItem(PENDING_UPDATE_KEY);
+    // KEIN RELOAD! Warte auf Klick!
+});
     }
 }
 
@@ -2385,7 +2380,7 @@ if (!document.getElementById('app-animations')) {
 
      <!-- Version-Info -->
     <div class="version-info">
-        v1.4.8 – © Matthias Kloß MPZ NB
+        v1.4.9 – © Matthias Kloß MPZ NB
     </div>
 
     <!-- === LÖSCH-ANIMATION === -->
