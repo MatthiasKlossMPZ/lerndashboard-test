@@ -2168,7 +2168,7 @@ function printOptimized() {
 }
 // === AUTOMATISCHE UPDATE-PRÜFUNG MIT GITHUB + SERVICE WORKER ===
 const CURRENT_VERSION = '1.3.5';  // Muss mit HTML-Version übereinstimmen
-const GITHUB_REPO = 'https://matthiasklossmpz.github.io/lerndashboard-test/';
+const GITHUB_REPO = 'matthiasklossmpz/lerndashboard-test';
 const UPDATE_CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24 Stunden
 const LAST_CHECK_KEY = 'lastUpdateCheck';
 const PENDING_UPDATE_KEY = 'pendingUpdateVersion';
@@ -2202,7 +2202,7 @@ async function checkForAppUpdate() {
 }
 
 // === UPDATE BANNER MIT BUTTON ===
-function showUpdateBanner() {
+function showUpdateBanner(version) {
     if (document.getElementById('updateBanner')) return;
 
     const banner = document.createElement('div');
@@ -2220,7 +2220,7 @@ function showUpdateBanner() {
         </svg>
         <div>
             <strong>Update verfügbar!</strong><br>
-            <span style="font-weight: normal; font-size: 13px;">Neue Version ist bereit</span>
+            <span style="font-weight: normal; font-size: 13px;">v${version} – Neue Version ist bereit</span>
         </div>
         <button id="updateNowBtn" style="
             background: white; color: #27ae60; border: none; border-radius: 10px;
@@ -2235,10 +2235,22 @@ function showUpdateBanner() {
 
     // Button: Update jetzt
     banner.querySelector('#updateNowBtn').onclick = () => {
+        banner.style.display = 'none';  // Banner verstecken
         if (newServiceWorker) {
             newServiceWorker.postMessage({ action: 'skipWaiting' });
+        } else {
+            location.reload();
         }
     };
+
+    // Banner 5 Sekunden sichtbar halten
+    setTimeout(() => {
+        if (document.getElementById('updateBanner')) {
+            document.getElementById('updateBanner').style.transition = 'opacity 0.3s ease';
+            document.getElementById('updateBanner').style.opacity = '0';
+            setTimeout(() => document.getElementById('updateBanner')?.remove(), 300);
+        }
+    }, 5000);
 }
 
 // === UPDATE-BANNER MIT "JETZT INSTALLIEREN" ===
@@ -2336,7 +2348,7 @@ if (!document.getElementById('app-animations')) {
 
      <!-- Version-Info -->
     <div class="version-info">
-        v1.4.4 – © Matthias Kloß MPZ NB
+        v1.4.5 – © Matthias Kloß MPZ NB
     </div>
 
     <!-- === LÖSCH-ANIMATION === -->
