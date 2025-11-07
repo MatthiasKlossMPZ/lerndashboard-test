@@ -2249,15 +2249,15 @@ function showUpdateBanner(version) {
     }, 300);
 };
 
-    // Banner 5 Sekunden sichtbar halten
-    setTimeout(() => {
-        if (document.getElementById('updateBanner')) {
-            document.getElementById('updateBanner').style.transition = 'opacity 0.3s ease';
-            document.getElementById('updateBanner').style.opacity = '0';
-            setTimeout(() => document.getElementById('updateBanner')?.remove(), 300);
-        }
-    }, 5000);
-}
+// Banner 10 Sekunden sichtbar halten
+setTimeout(() => {
+    const b = document.getElementById('updateBanner');
+    if (b) {
+        b.style.transition = 'opacity 0.5s ease';
+        b.style.opacity = '0';
+        setTimeout(() => b.remove(), 500);
+    }
+}, 10000);  // 10 Sekunden
 
 // === UPDATE-BANNER MIT "JETZT INSTALLIEREN" ===
 function showUpdateReady() {
@@ -2355,7 +2355,7 @@ if (!document.getElementById('app-animations')) {
 
      <!-- Version-Info -->
     <div class="version-info">
-        v1.4.6 – © Matthias Kloß MPZ NB
+        v1.4.7 – © Matthias Kloß MPZ NB
     </div>
 
     <!-- === LÖSCH-ANIMATION === -->
