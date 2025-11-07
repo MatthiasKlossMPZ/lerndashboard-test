@@ -12,12 +12,19 @@ const urlsToCache = [
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
 ];
 
-// INSTALL: Cache alles
+// INSTALL: Cache alles – mit Fehlerbehandlung
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
-      .then(() => self.skipWaiting()) // Sofort aktivieren
+      .then(cache => {
+        // Versuche zu cachen, aber ignoriere Fehler
+        return cache.addAll(urlsToCache).catch(err => {
+          console.warn('[SW] Einige Dateien konnten nicht gecacht werden (offline?):', err);
+          // Cache trotzdem öffnen
+          return cache;
+        });
+      })
+      .then(() => self.skipWaiting())
   );
 });
 
