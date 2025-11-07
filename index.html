@@ -122,7 +122,7 @@
         align-self: flex-end;
     }
     .export-buttons { margin: 15px 0; display: flex; gap: 10px; flex-wrap: wrap; }
-    .btn { background: var(--primary); color: white; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: 0.2s; }
+    .btn { background: var(--primary); color: white; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: normal; transition: 0.2s; }
     .btn:hover { opacity: 0.9; transform: translateY(-1px); }
     .file-input { display: none; }
     .new-resource-btn { display: block; margin: 20px auto; padding: 14px 28px; font-size: 17px; font-weight: 700; background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 6px 16px rgba(107,70,193,0.3); transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 8px; max-width: 360px; }
@@ -518,7 +518,7 @@
 </head>
 <body>
 <div style="background: #ff4444; color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 18px; position: fixed; top: 0; left: 0; width: 100%; z-index: 9999; box-shadow: 0 2px 10px rgba(0,0,0,0.3);">
-  TESTVERSION – nur für dich! (Diese Änderungen sind noch nicht live)
+  TESTVERSION – nur für internen Gebrauch! (Diese Änderungen sind noch nicht live)
 </div>
 
 <!-- Kleiner Abstand, damit der Rest nicht unter dem Banner verschwindet -->
@@ -696,18 +696,44 @@
             <div class="stat-card"><div>Fächer</div><span id="statSubjects">0</span></div>
         </div>
 
-        <!-- EXPORT -->
+         <!-- EXPORT – HORIZONTAL GRUPPIERT + FILTERABHÄNGIGKEIT KLAR -->
         <div class="export-buttons">
-            <button class="btn csv" onclick="exportCSV()">CSV</button>
-            <button class="btn pdf" onclick="exportPDF()">PDF</button>
-            <button class="btn matrix" onclick="exportMatrixCSV()" style="background:#e67e22;">Matrix (CSV)</button>
-            <button class="btn matrix" onclick="exportMatrixPDF()" style="background:#9c27b0; color:white;">Matrix (PDF)</button>
-            <button class="btn matrix" onclick="exportMatrixExcel()" style="background:#27ae60; color:white; border:2px solid #1e7e34;">
-            Matrix (Excel)</button>            
-            <button class="btn print" onclick="window.print()">Drucken</button>
-            <label class="btn import"> <input type="file" accept=".csv" class="file-input" onchange="importCSV(event)"> <span>Import</span> </label>
-            <button class="btn template" onclick="exportTemplate()">Vorlage</button>
-            <button class="btn" onclick="autoBackup()">Backup jetzt</button> 
+            <!-- GRUPPE 1: Filter-Exporte (CSV, PDF, Matrix) -->
+            <div class="export-group horizontal">
+                <h4 class="export-group-title" id="filterExportTitle">Filter-Exporte</h4>
+                <div class="btn-row">
+                    <button class="btn csv filtered-export" onclick="exportCSV()" 
+                            title="Exportiert gefilterte Ressourcen als CSV (Fach, Klasse, Tool, etc.)">CSV</button>
+                    <button class="btn pdf filtered-export" onclick="exportPDF()" 
+                            title="Exportiert gefilterte Ressourcen als PDF (nur sichtbare Einträge)">PDF</button>
+                    <button class="btn matrix filtered-export" onclick="exportMatrixCSV()" 
+                            style="background:#e67e22;" 
+                            title="Matrix als CSV – basierend auf aktuellen Filtern">Matrix CSV</button>
+                    <button class="btn matrix filtered-export" onclick="exportMatrixPDF()" 
+                            style="background:#9c27b0; color:white;" 
+                            title="Matrix als PDF – nur gefilterte Daten">Matrix PDF</button>
+                    <button class="btn matrix filtered-export" onclick="exportMatrixExcel()" 
+                            style="background:#27ae60; color:white; border:2px solid #1e7e34;" 
+                            title="Formatierte Excel-Matrix mit aktuellen Filtern">Matrix Excel</button>
+                </div>
+            </div>
+
+            <!-- GRUPPE 2: Datenmanagement (unabhängig von Filtern) -->
+            <div class="export-group horizontal">
+                <h4 class="export-group-title">Datenmanagement</h4>
+                <div class="btn-row">
+                    <button class="btn print" onclick="window.print()" 
+                            title="Druckt die aktuelle Ansicht (unabhängig von Filtern)">Drucken</button>
+                    <label class="btn import" title="Importiert neue Ressourcen aus einer CSV-Datei">
+                        <input type="file" accept=".csv" class="file-input" onchange="importCSV(event)">
+                        <span>Import</span>
+                    </label>
+                    <button class="btn template" onclick="exportTemplate()" 
+                            title="Lädt eine leere CSV-Vorlage zum Ausfüllen">Vorlage</button>
+                    <button class="btn" onclick="autoBackup()" 
+                            title="Erstellt sofort ein lokales Backup aller Daten">Backup jetzt</button>
+                </div>
+            </div>
         </div>
 
 <button class="new-resource-btn" onclick="openNewResourceWindow()">
@@ -851,23 +877,17 @@ function updateToolFilter() {
     }
 }
 
-    // === STATISTIK ===
     function updateStats() {
-        const els = {
-            statTotal: resources.length,
-            statFavorites: resources.filter(r => r.favorite).length,
-            statTools: tools.size,
-            statSubjects: new Set(resources.map(r => r.subject)).size
-        };
-        Object.entries(els).forEach(([id, val]) => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = val;
-        });
-        updateSubjectBarStats();
+        const filtered = getFilteredResources();
+        document.getElementById('statTotal').textContent = filtered.length;
+        document.getElementById('statFavorites').textContent = filtered.filter(r => r.favorite).length;
+        document.getElementById('statTools').textContent = [...new Set(filtered.map(r => r.tool).filter(Boolean))].length;
+        document.getElementById('statSubjects').textContent = [...new Set(filtered.map(r => r.subject))].length;
+        updateSubjectBarStats(filtered);
     }
 
-    function updateSubjectBarStats() {
-        const count = resources.reduce((a, r) => (a[r.subject] = (a[r.subject] || 0) + 1, a), {});
+    function updateSubjectBarStats(filtered) {
+        const count = filtered.reduce((a, r) => (a[r.subject] = (a[r.subject] || 0) + 1, a), {});
         const container = document.getElementById('statsFach');
         if (!container) return;
         container.innerHTML = '';
@@ -886,41 +906,68 @@ function updateToolFilter() {
             });
     }
 
-    // === FILTER & ANZEIGE ===
- function applyFilters() {
+    // === EINMALIGE HILFSFUNKTION: Gefilterte Ressourcen zurückgeben ===
+function getFilteredResources() {
     const f = {
-        subject: document.getElementById('filterSubject')?.value.toLowerCase() || '',
-        grade: document.getElementById('filterGrade')?.value.toLowerCase() || '',
-        competence: document.getElementById('filterCompetence')?.value.toLowerCase() || '',
-        level: document.getElementById('filterLevel')?.value || '',  // OK
-        tool: document.getElementById('filterTool')?.value.toLowerCase() || '',
-        favorite: document.getElementById('filterFavorite')?.value || '',
-        topic: document.getElementById('searchTopic')?.value.toLowerCase() || ''
+        subject: document.getElementById('filterSubject')?.value?.toLowerCase() || '',
+        grade: document.getElementById('filterGrade')?.value || '',
+        competence: document.getElementById('filterCompetence')?.value || '',
+        level: document.getElementById('filterLevel')?.value || '',
+        tool: document.getElementById('filterTool')?.value?.toLowerCase() || '',
+        favorite: document.getElementById('filterFavorite')?.value === 'true',
+        topic: document.getElementById('searchTopic')?.value?.toLowerCase().trim() || ''
     };
 
-    const filtered = resources.filter(r =>
-        (!f.subject || r.subject.toLowerCase() === f.subject) &&
-        (!f.grade || r.grade.toLowerCase() === f.grade) &&
-        (!f.competence || r.competence.toLowerCase() === f.competence) &&
-        (!f.level || r.level === f.level) &&  // FIX: f.level statt level
-        (!f.tool || (r.tool && r.tool.toLowerCase() === f.tool)) &&
-        (f.favorite === '' || r.favorite === (f.favorite === 'true')) &&
-        (!f.topic || r.topic.toLowerCase().includes(f.topic))
-    );
+    return resources.filter(r => {
+        const topic = r.topic?.toLowerCase() || '';
+        const subject = r.subject?.toLowerCase() || '';
+        const grade = r.grade || '';
+        const competence = r.competence || '';
+        const level = r.level || '';
+        const tool = r.tool?.toLowerCase() || '';
+        const isFavorite = r.favorite || false;
+
+        if (f.subject && subject !== f.subject) return false;
+        if (f.grade && grade !== f.grade) return false;
+        if (f.competence && competence !== f.competence) return false;
+        if (f.level && level !== f.level) return false;
+        if (f.tool && tool !== f.tool) return false;
+        if (f.favorite && !isFavorite) return false;
+        if (f.topic && !topic.includes(f.topic)) return false;
+        return true;
+    });
+}
+
+    // === FILTER & ANZEIGE ===
+function applyFilters() {
+    const filtered = getFilteredResources();
     displayResources(filtered);
     updateStats();
+    updateFilterHighlight();
+    updateFilterStatus();
 }
 // === FILTER-HIGHLIGHT: Färbe .filter-container bei aktivem Filter ===
 function updateFilterHighlight() {
     const container = document.querySelector('.filter-container');
     if (!container) return;
-
     const selects = container.querySelectorAll('select');
     const search = container.querySelector('#searchTopic');
     const isActive = Array.from(selects).some(s => s.value && s.value !== '') ||
                      (search && search.value.trim() !== '');
-
     container.classList.toggle('active', isActive);
+}
+
+// === FILTER-STATUS FÜR EXPORT-BUTTONS ===
+function updateFilterStatus() {
+    const isFiltered = getFilteredResources().length < resources.length;
+    const title = document.getElementById('filterExportTitle');
+    if (title) {
+        title.textContent = isFiltered ? 'Filter-Exporte (aktiv)' : 'Filter-Exporte';
+        title.style.color = isFiltered ? '#e74c3c' : 'var(--primary)';
+    }
+    document.querySelectorAll('.filtered-export').forEach(btn => {
+        btn.classList.toggle('active', isFiltered);
+    });
 }
 
 // Wird bei jedem Filterwechsel aufgerufen
@@ -928,33 +975,14 @@ const originalApplyFilters = applyFilters;
 window.applyFilters = function() {
     originalApplyFilters();
     updateFilterHighlight();
+    updateFilterStatus();
 };
 
 // Beim Laden prüfen
-document.addEventListener('DOMContentLoaded', updateFilterHighlight);
-
-// === HILFSFUNKTION: Gefilterte Ressourcen zurückgeben (ohne Anzeige) ===
-function getFilteredResources() {
-    const f = {
-        subject: document.getElementById('filterSubject')?.value.toLowerCase() || '',
-        grade: document.getElementById('filterGrade')?.value.toLowerCase() || '',
-        competence: document.getElementById('filterCompetence')?.value.toLowerCase() || '',
-        level: document.getElementById('filterLevel')?.value || '',
-        tool: document.getElementById('filterTool')?.value.toLowerCase() || '',
-        favorite: document.getElementById('filterFavorite')?.value || '',
-        topic: document.getElementById('searchTopic')?.value.toLowerCase() || ''
-    };
-
-    return resources.filter(r =>
-        (!f.subject || r.subject.toLowerCase() === f.subject) &&
-        (!f.grade || r.grade.toLowerCase() === f.grade) &&
-        (!f.competence || r.competence.toLowerCase() === f.competence) &&
-        (!f.level || r.level === f.level) &&
-        (!f.tool || (r.tool && r.tool.toLowerCase() === f.tool)) &&
-        (f.favorite === '' || r.favorite === (f.favorite === 'true')) &&
-        (!f.topic || r.topic.toLowerCase().includes(f.topic))
-    );
-}
+document.addEventListener('DOMContentLoaded', () => {
+    populateDropdowns();
+    applyFilters();
+});
 
     function resetFilters() {
         ['filterSubject','filterGrade','filterCompetence','filterLevel','filterTool','filterFavorite'].forEach(id => {
@@ -1360,19 +1388,23 @@ function exportTemplate() {
     link.click();
 }
 
+function applyFilters() {
+    const filtered = getFilteredResources();
+    displayResources(filtered);
+    updateStats();                  // ← Statistiken mit gefilterten Daten
+    updateFilterHighlight();        // ← Filter-Container rot
+    updateFilterStatus();           // ← "Filter-Exporte (aktiv)" + Button-Puls
+}
+
 function exportCSV() {
-    const filteredResources = getFilteredResources();
-    if (filteredResources.length === 0) {
-        showAlert("Keine passenden Ressourcen für den Export!\nTipp: Filter zurücksetzen oder Daten prüfen.");
+    const filtered = getFilteredResources();
+    if (filtered.length === 0) {
+        showAlert("Keine gefilterten Daten zum Exportieren!\nTipp: Filter zurücksetzen oder Daten prüfen.");
         return;
     }
 
-    const COLUMNS = [
-        'Thema', 'Unterrichtsfach', 'Klassenstufe', 'Kompetenzbereich',
-        'Niveaustufe', 'Digitales_Hilfsmittel', 'Beschreibung'
-    ];
-
-    const csvContent = filteredResources.map(r => [
+    const COLUMNS = ['Thema', 'Unterrichtsfach', 'Klassenstufe', 'Kompetenzbereich', 'Niveaustufe', 'Digitales_Hilfsmittel', 'Beschreibung'];
+    const csvContent = filtered.map(r => [
         `"${(r.topic || '').replace(/"/g, '""')}"`,
         `"${(r.subject || '')}"`,
         `"${(r.grade || '')}"`,
@@ -1383,40 +1415,21 @@ function exportCSV() {
     ].join(',')).join('\n');
 
     const fullCsv = `${COLUMNS.join(',')}\n${csvContent}`;
-
-    // FIX: Direkter Blob mit UTF-8 (kein encodeURI, das killt Umlaute)
-    const blob = new Blob([`\uFEFF${fullCsv}`], { type: 'text/csv;charset=utf-8;' });
-
-    // Für kleine Files: Direkt download (schneller, ohne Zip)
-    if (filteredResources.length <= 500) {
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `LernDashboard_Ressourcen_${new Date().toISOString().slice(0, 10)}.csv`;
-        link.click();
-        return;
-    }
-
-    // Große Files: Zip (wie vorher, aber mit Blob)
-    const zip = new JSZip();
-    zip.file('ressourcen.csv', blob);
-    zip.generateAsync({ type: 'blob' }).then(content => {
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(content);
-        link.download = `LernDashboard_Ressourcen_${new Date().toISOString().slice(0, 10)}.zip`;
-        link.click();
-    }).catch(err => showAlert(`Zip-Fehler: ${err.message}`));
+    const blob = new Blob(['\uFEFF' + fullCsv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `LernDashboard_Gefiltert_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
 }
 
 function exportPDF() {
-    const filteredResources = getFilteredResources();
-    if (filteredResources.length === 0) {
-        showAlert("Keine passenden Ressourcen für den Export!\nTipp: Filter zurücksetzen oder Daten prüfen.");
+    const filtered = getFilteredResources();
+    if (filtered.length === 0) {
+        showAlert("Keine gefilterten Daten zum Exportieren!\nTipp: Filter zurücksetzen oder Daten prüfen.");
         return;
     }
 
-    // FIX: Korrekte jsPDF-Instanz (für v3.0.3)
-    const { jsPDF } = window.jspdf;  // Das bleibt, aber falls Fehler: Alternativ: const jsPDF = window.jspdf.jsPDF;
-
+    const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -1425,41 +1438,30 @@ function exportPDF() {
     const startX = 15;
     let pageNumber = 1;
 
-    // === SCHULNAME OBEN RECHTS (nur auf Seite 1) ===
+    // Schulname
     const schoolName = getSchoolName() || 'Deine Schule';
     doc.setFontSize(11);
     doc.setTextColor(schoolName === 'Deine Schule' ? 150 : 80);
     doc.setFont('helvetica', 'italic');
     doc.text(schoolName, pageWidth - 15, 15, { align: 'right' });
 
-    // === TITEL (mit Filter-Info) ===
-    const subjectFilter = document.getElementById('filterSubject')?.value?.trim() || '';
-    const gradeFilter = document.getElementById('filterGrade')?.value?.trim() || '';
-    let filterInfo = '';
-    if (subjectFilter) filterInfo += `${subjectFilter} `;
-    if (gradeFilter) filterInfo += `| ${gradeFilter} `;
-    if (filterInfo) filterInfo = ` (Filter: ${filterInfo.trim()})`;
-
+    // Titel
     doc.setFontSize(20);
     doc.setTextColor(107, 70, 193);
     doc.setFont('helvetica', 'bold');
-    doc.text(`LernDashboard Digital${filterInfo}`, pageWidth / 2, y, { align: 'center' });
+    doc.text('LernDashboard Digital', pageWidth / 2, y, { align: 'center' });
     y += 8;
-
     doc.setFontSize(11);
     doc.setTextColor(100);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Digitale Unterrichtsideen', pageWidth / 2, y, { align: 'center' });
+    doc.text('Gefilterte Unterrichtsideen', pageWidth / 2, y, { align: 'center' });
     y += 10;
-
     doc.setFontSize(9);
     doc.setTextColor(120);
     doc.text(`Exportiert am: ${new Date().toLocaleDateString('de-DE')}`, pageWidth - 15, y, { align: 'right' });
     y += 12;
 
-    // === SEITENUMBRUCH ===
-    const addPageIfNeeded = (neededHeight) => {
-        if (y + neededHeight > pageHeight - 25) {
+    const addPageIfNeeded = (h) => {
+        if (y + h > pageHeight - 25) {
             doc.setFontSize(8);
             doc.setTextColor(150);
             doc.text(`Seite ${pageNumber}`, pageWidth - 20, pageHeight - 10);
@@ -1473,17 +1475,9 @@ function exportPDF() {
         }
     };
 
-    // === TAG-FARBEN (erweitert um Fach) ===
-    const tagColors = {
-        subject: [155, 89, 182],   // #9b59b6
-        grade: [80, 200, 120],
-        competence: [255, 140, 0],
-        level: [0, 191, 255],
-        tool: [30, 144, 255]
-    };
+    const tagColors = { subject: [155,89,182], grade: [80,200,120], competence: [255,140,0], level: [0,191,255], tool: [30,144,255] };
 
-    // Verwende gefilterte Ressourcen
-    filteredResources.forEach((r, i) => {
+    filtered.forEach((r, i) => {
         const topic = r.topic || '—';
         const subject = r.subject || '—';
         const grade = r.grade || '—';
@@ -1492,7 +1486,6 @@ function exportPDF() {
         const tool = r.tool || '—';
         const description = r.description || '';
 
-        // Thema
         doc.setFontSize(11);
         doc.setTextColor(0);
         doc.setFont('helvetica', 'bold');
@@ -1501,24 +1494,11 @@ function exportPDF() {
         doc.text(topicLines, startX, y);
         y += topicLines.length * lineHeight + 3;
 
-        // Tags (jetzt inkl. Fach)
         let x = startX;
-        const tagHeight = 5;
-        const tagPadding = 2;
-        const tagGap = 6; // etwas kleiner, damit 5 Tags passen
-        const textY = y - 0.7;
-
-        const tags = [
-            { text: subject, type: 'subject' },
-            { text: grade, type: 'grade' },
-            { text: competence, type: 'competence' },
-            { text: level, type: 'level' },
-            { text: tool, type: 'tool' }
-        ];
-
+        const tagHeight = 5, tagPadding = 2, tagGap = 6, textY = y - 0.7;
+        const tags = [{text:subject,type:'subject'},{text:grade,type:'grade'},{text:competence,type:'competence'},{text:level,type:'level'},{text:tool,type:'tool'}];
         doc.setFontSize(8.5);
         doc.setFont('helvetica', 'normal');
-
         tags.forEach(tag => {
             if (tag.text === '—') return;
             const color = tagColors[tag.type];
@@ -1530,10 +1510,8 @@ function exportPDF() {
             doc.text(tag.text, x + tagPadding, textY);
             x += tagWidth + tagGap;
         });
-
         y += 6;
 
-        // Beschreibung
         if (description) {
             doc.setFontSize(9);
             doc.setTextColor(70);
@@ -1545,25 +1523,20 @@ function exportPDF() {
             doc.rect(startX - 1, y - 1.5, pageWidth - 30 + 2, descHeight + 3, 'F');
             doc.text(descLines, startX, y + lineHeight - 1);
             y += descHeight + 6;
-        } else {
-            y += 4;
-        }
+        } else y += 4;
 
-        // Trennlinie
         doc.setDrawColor(220);
         doc.setLineWidth(0.3);
         doc.line(startX, y, pageWidth - 15, y);
         y += 8;
     });
 
-    // === FUSSZEILE ===
     doc.setFontSize(8);
     doc.setTextColor(150);
     doc.text(`Seite ${pageNumber}`, pageWidth - 20, pageHeight - 10);
-
-    // === SPEICHERN ===
-    doc.save(`LernDashboard_Ressourcen_${new Date().toISOString().slice(0, 10)}.pdf`);
+    doc.save(`LernDashboard_Gefiltert_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
+
 // === BEARB. BESTÄTIGUNG (ohne Ton) ===
 function showEditConfirmation() {
     const anim = document.getElementById('editAnimation');
@@ -1637,6 +1610,25 @@ window.addEventListener('message', function(event) {
         }
     }
 });
+
+// === CHROME TOOLTIP-FIX BEIM DRUCKEN ===
+let printTooltipFix = false;
+window.addEventListener('beforeprint', () => {
+    printTooltipFix = true;  // Flag setzen
+    // Sofort Tooltips ausblenden
+    document.querySelectorAll('.btn[title]').forEach(btn => {
+        btn.blur();  // Hover "abbrechen"
+    });
+});
+
+window.addEventListener('afterprint', () => {
+    printTooltipFix = false;
+    // Tooltip-Container leeren (falls sichtbar)
+    document.querySelectorAll('::after, ::before').forEach(el => el.remove());  // Fallback-Cleanup
+    // Oder: Hover manuell zurücksetzen
+    document.body.style.cursor = 'default';
+});
+
  // Nur bei HTTP/HTTPS aktivieren (nicht bei file://)
 if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.protocol === 'https:')) {
     navigator.serviceWorker.register('service-worker.js').then(reg => {
@@ -2065,10 +2057,151 @@ function exportMatrixExcel() {
     const today = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(wb, `LernDashboard_Matrix_${today}.xlsx`);
 }
-function autoBackup() {
-    exportCSV();  // Nutzt die bestehende Export-Funktion
-    showAlert("Backup als CSV erstellt!");
+// === FILTER-STATUS: HERVORHEBUNG + TITEL DYNAMISCH ===
+function updateFilterStatus() {
+    const filters = {
+        subject: document.getElementById('filterSubject')?.value,
+        grade: document.getElementById('filterGrade')?.value,
+        tool: document.getElementById('filterTool')?.value,
+        competence: document.getElementById('filterCompetence')?.value,
+        level: document.getElementById('filterLevel')?.value,
+        favorite: document.getElementById('filterFavorite')?.value,
+        search: document.getElementById('searchTopic')?.value.trim()
+    };
+
+    const isFiltered = Object.values(filters).some(v => v && v !== '' && v !== 'Alle');
+
+    // Titel dynamisch
+    const title = document.getElementById('filterExportTitle');
+    if (title) {
+        title.textContent = isFiltered ? 'Filter-Exporte (aktiv)' : 'Filter-Exporte';
+        title.style.color = isFiltered ? '#e74c3c' : 'var(--primary)';
+    }
+
+    // Buttons hervorheben
+    document.querySelectorAll('.filtered-export').forEach(btn => {
+        btn.classList.toggle('active', isFiltered);
+    });
 }
+
+// Beim Laden
+document.addEventListener('DOMContentLoaded', updateFilterStatus);
+
+// === BACKUP MIT MODAL + AUTOMATISCHER DOWNLOAD ===
+function autoBackup() {
+    const allResources = JSON.parse(localStorage.getItem('resources') || '[]');
+    
+    if (allResources.length === 0) {
+        showFancyAlert('Keine Daten zum Sichern!', 'warning');
+        return;
+    }
+
+    // Modal erstellen (unverändert)
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position:fixed; top:0; left:0; width:100%; height:100%;
+        background:rgba(0,0,0,0.6); backdrop-filter:blur(8px);
+        display:flex; justify-content:center; align-items:center;
+        z-index:20000; font-family:Segoe UI,sans-serif;
+    `;
+    modal.innerHTML = `
+        <div style="
+            background:var(--card); padding:32px; border-radius:20px; text-align:center;
+            width:90%; max-width:420px; box-shadow:0 16px 48px rgba(0,0,0,0.3);
+            transform:scale(0.9); opacity:0;
+            transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s ease;
+        ">
+            <div id="backupIcon" style="width:80px; height:80px; margin:0 auto 20px;">
+                <svg width="80" height="80" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="44" fill="none" stroke="#e0e0e0" stroke-width="4"/>
+                    <circle id="backupCircle" cx="50" cy="50" r="44" fill="none" stroke="#6b46c1" stroke-width="4"
+                            stroke-dasharray="276.46" stroke-dashoffset="276.46"
+                            style="transition:stroke-dashoffset 1s ease;"/>
+                    <path id="backupCheck" d="M30 50 L45 65 L70 35" fill="none" stroke="#27ae60" stroke-width="6"
+                          stroke-linecap="round" stroke-linejoin="round"
+                          style="stroke-dasharray:100; stroke-dashoffset:100;"/>
+                </svg>
+            </div>
+            <p id="backupTitle" style="font-size:19px; font-weight:700; color:var(--text); margin:0 0 8px;">
+                Backup wird erstellt...
+            </p>
+            <p id="backupSubtitle" style="font-size:14px; color:var(--text-light); margin:0;">
+                ${allResources.length} Ressourcen werden gesichert
+            </p>
+            <div style="margin-top:20px; height:6px; background:#e0e0e0; border-radius:3px; overflow:hidden;">
+                <div id="backupProgress" style="width:0%; height:100%; background:#6b46c1; border-radius:3px; transition:width 0.8s ease;"></div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    // Animation: Modal einblenden (unverändert)
+    requestAnimationFrame(() => {
+        modal.querySelector('div').style.transform = 'scale(1)';
+        modal.querySelector('div').style.opacity = '1';
+    });
+
+    // Fortschritt simulieren (unverändert)
+    const progress = modal.querySelector('#backupProgress');
+    const circle = modal.querySelector('#backupCircle');
+    const title = modal.querySelector('#backupTitle');
+    const subtitle = modal.querySelector('#backupSubtitle');
+    const check = modal.querySelector('#backupCheck');
+
+    setTimeout(() => {
+        progress.style.width = '100%';
+        circle.style.strokeDashoffset = '0';
+    }, 100);
+
+    // CSV generieren & downloaden – FRÜHER AUSLÖSEN (nach 300ms, während Animation läuft)
+    setTimeout(() => {
+        const headers = ['Thema','Unterrichtsfach','Klassenstufe','Kompetenzbereich','Niveaustufe','Digitales_Hilfsmittel','Beschreibung'];
+        const csv = [
+            headers.join(','),
+            ...allResources.map(r => [
+                `"${(r.topic||'').replace(/"/g,'""')}"`,
+                `"${r.subject||''}"`,
+                `"${r.grade||''}"`,
+                `"${r.competence||''}"`,
+                `"${r.level||''}"`,
+                `"${(r.tool||'').replace(/"/g,'""')}"`,
+                `"${(r.description||'').replace(/"/g,'""')}"`
+            ].join(','))
+        ].join('\n');
+
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `LernDashboard_Backup_${new Date().toISOString().slice(0,10)}.csv`;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        // Erfolg anzeigen (unverändert)
+        title.textContent = 'Backup erfolgreich!';
+        title.style.color = '#27ae60';
+        subtitle.textContent = 'Datei wird heruntergeladen...';
+        check.style.strokeDashoffset = '0';
+        check.style.animation = 'draw 0.6s ease forwards';
+
+        // Modal nach 1,5 Sek schließen (unverändert)
+        setTimeout(() => {
+            modal.style.opacity = '0';
+            setTimeout(() => modal.remove(), 400);
+        }, 1500);
+    }, 300);  // ← Hier früher: 300ms statt 1000ms
+}
+
+// === ANIMATIONS-KEYFRAME (einmalig einfügen, falls noch nicht da) ===
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes draw { to { stroke-dashoffset: 0; } }
+`;
+document.head.appendChild(style);
+
  </script>  <!-- ← ENDE SCRIPT -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
@@ -2141,6 +2274,126 @@ td {
 /* Optional: Letzte Zeile ohne unteren Rand */
 tr:last-child td {
     border-bottom: none !important;
+}
+/* === EXPORT: HORIZONTAL + FILTERABHÄNGIGKEIT KLAR === */
+.export-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    align-items: flex-start;
+    margin: 15px 0;
+    justify-content: flex-start;
+}
+
+.export-group.horizontal {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 300px;
+    flex: 1;
+}
+
+.export-group-title {
+    margin: 0 !important;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--primary);
+    padding-bottom: 4px;
+    border-bottom: 2px solid var(--primary-light);
+    text-align: left;
+}
+
+#filterExportTitle {
+    transition: color 0.3s ease;
+}
+
+.btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* === FILTER-EXPORT BUTTONS: Hervorhebung bei aktiven Filtern === */
+.filtered-export {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.filtered-export.active {
+    animation: pulse 2s infinite;
+    box-shadow: 0 0 0 2px #e74c3c !important;
+    transform: translateY(-1px);
+}
+
+@keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 2px #e74c3c; }
+    50% { box-shadow: 0 0 0 4px #e74c3c, 0 0 12px rgba(231, 76, 60, 0.4); }
+}
+
+/* === TOOLTIPS === */
+.btn[title] {
+    position: relative;
+    cursor: pointer;
+}
+
+.btn[title]:hover::after,
+.btn[title]:focus::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    white-space: nowrap;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    margin-bottom: 8px;
+    max-width: 300px;
+    white-space: normal;
+    line-height: 1.4;
+}
+
+.btn[title]:hover::before,
+.btn[title]:focus::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: #333;
+    margin-bottom: 2px;
+    z-index: 1000;
+}
+
+/* === MOBILE === */
+@media (max-width: 768px) {
+    .export-buttons {
+        flex-direction: column;
+        gap: 16px;
+    }
+    .export-group.horizontal {
+        min-width: 100%;
+    }
+    .export-group-title {
+        text-align: center;
+        font-size: 13.5px;
+    }
+    .btn-row {
+        justify-content: center;
+    }
+    .btn[title]:hover::after,
+    .btn[title]:hover::before {
+        display: none;
+    }
+    .btn[title]:active::after,
+    .btn[title]:active::before {
+        display: block;
+    }
 }
 
     </style>
