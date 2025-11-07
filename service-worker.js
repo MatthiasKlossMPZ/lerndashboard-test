@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lerndashboard-v59'; // Erhöhe bei Update!
+const CACHE_NAME = 'lerndashboard-v60'; // Erhöhe bei Update!
 
 const urlsToCache = [
   '/',
