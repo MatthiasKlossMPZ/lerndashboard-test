@@ -1058,26 +1058,30 @@ function deleteResource(i) {
     const resource = resources[i];
     if (!resource) return;
 
-    // 1. Animation starten – RICHTIGE ELEMENT!
-    const anim = document.getElementById('deleteAnimation');
-    anim.classList.add('delete-active');
+    // Bestätigungs-Popup
+    showAlert(
+        `Möchtest du die Ressource wirklich löschen?\n\n` +
+        `<strong>${resource.topic}</strong>\n` +
+        `${resource.subject} | ${resource.grade} | ${resource.competence}${resource.level ? ' | ' + resource.level : ''}`,
+        () => {
+            // Bestätigt → Löschen mit Animation
+            const anim = document.getElementById('deleteAnimation');
+            anim.classList.add('delete-active');
 
-    // 2. Ton (optional)
-    try {
-        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBQ==');
-        audio.volume = 0.2;
-        audio.play();
-    } catch(e) {}
+            try {
+                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBQ==');
+                audio.volume = 0.2;
+                audio.play();
+            } catch(e) {}
 
-    // 3. Nach 1,6s löschen + aufräumen
-    setTimeout(() => {
-        resources.splice(i, 1);
-        localStorage.setItem('resources', JSON.stringify(resources));
-        applyFilters();
-
-        // Animation beenden – RICHTIGE ELEMENT!
-        anim.classList.remove('delete-active');
-    }, 1600);
+            setTimeout(() => {
+                resources.splice(i, 1);
+                localStorage.setItem('resources', JSON.stringify(resources));
+                applyFilters();
+                anim.classList.remove('delete-active');
+            }, 1600);
+        }
+    );
 }
 
     // === AUTOCOMPLETE ===
@@ -1316,65 +1320,60 @@ function exportTemplate() {
     link.click();
 }
 
-    function exportCSV() {
+function exportCSV() {
     if (resources.length === 0) {
         showAlert("Keine Daten zum Exportieren!");
         return;
     }
 
-    // === EINHEITLICHE SPALTENDEFINITION (für Export, Import, Vorlage) ===
     const COLUMNS = [
-        'Thema',
-        'Unterrichtsfach',
-        'Klassenstufe',
-        'Kompetenzbereich',
-        'Niveaustufe',
-        'Digitales Hilfsmittel',
-        'Beschreibung'
+        'Thema', 'Unterrichtsfach', 'Klassenstufe', 'Kompetenzbereich',
+        'Niveaustufe', 'Digitales_Hilfsmittel', 'Beschreibung'
     ];
 
-    const HEADER = COLUMNS.join(',') + '\n';
+    const csvContent = resources.map(r => [
+        `"${(r.topic || '').replace(/"/g, '""')}"`,
+        `"${(r.subject || '')}"`,
+        `"${(r.grade || '')}"`,
+        `"${(r.competence || '')}"`,
+        `"${(r.level || '')}"`,
+        `"${(r.tool || '').replace(/"/g, '""')}"`,
+        `"${(r.description || '').replace(/"/g, '""')}"`
+    ].join(',')).join('\n');
 
-    // === CHUNK-EXPORT (für große Datenmengen) ===
-    const chunkSize = 500;
-    const chunks = [];
+    const fullCsv = `${COLUMNS.join(',')}\n${csvContent}`;
 
-    for (let i = 0; i < resources.length; i += chunkSize) {
-        const chunk = resources.slice(i, i + chunkSize).map(r => {
-            return [
-                `"${(r.topic || '').replace(/"/g, '""')}"`,
-                `"${(r.subject || '')}"`,
-                `"${(r.grade || '')}"`,
-                `"${(r.competence || '')}"`,
-                `"${(r.level || '')}"`,
-                `"${(r.tool || '').replace(/"/g, '""')}"`,
-                `"${(r.description || '').replace(/"/g, '""')}"`
-            ].join(',');
-        }).join('\n');
+    // FIX: Direkter Blob mit UTF-8 (kein encodeURI, das killt Umlaute)
+    const blob = new Blob([`\uFEFF${fullCsv}`], { type: 'text/csv;charset=utf-8;' });
 
-        chunks.push(HEADER + chunk);
+    // Für kleine Files: Direkt download (schneller, ohne Zip)
+    if (resources.length <= 500) {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `LernDashboard_Ressourcen_${new Date().toISOString().slice(0, 10)}.csv`;
+        link.click();
+        return;
     }
 
-    // === ZIP-ERSTELLUNG ===
+    // Große Files: Zip (wie vorher, aber mit Blob)
     const zip = new JSZip();
-    chunks.forEach((chunk, index) => {
-        zip.file(`ressourcen_teil_${index + 1}.csv`, '\uFEFF' + chunk); // BOM für UTF-8
-    });
-
+    zip.file('ressourcen.csv', blob);
     zip.generateAsync({ type: 'blob' }).then(content => {
         const link = document.createElement('a');
         link.href = URL.createObjectURL(content);
         link.download = `LernDashboard_Ressourcen_${new Date().toISOString().slice(0, 10)}.zip`;
         link.click();
-    });
+    }).catch(err => showAlert(`Zip-Fehler: ${err.message}`));
 }
 
 function exportPDF() {
-    const { jsPDF } = window.jspdf;
     if (resources.length === 0) {
         showAlert("Keine Daten zum Exportieren!");
         return;
     }
+
+    // FIX: Korrekte jsPDF-Instanz (für v3.0.3)
+    const { jsPDF } = window.jspdf;  // Das bleibt, aber falls Fehler: Alternativ: const jsPDF = window.jspdf.jsPDF;
 
     const doc = new jsPDF('p', 'mm', 'a4');
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -1614,6 +1613,227 @@ if ('serviceWorker' in navigator && (location.protocol === 'http:' || location.p
         alert('Popup wurde blockiert – bitte erlauben!');
     }
 }
+function exportMatrixPDF() {
+    const { jsPDF } = window.jspdf;
+    const filtered = getFilteredResources();
+    if (filtered.length === 0) {
+        showAlert("Keine passenden Ressourcen für die Matrix!\nTipp: Filter zurücksetzen oder Daten prüfen.");
+        return;
+    }
+
+    const doc = new jsPDF('l', 'mm', 'a4');
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    // === LAYOUT ===
+    const leftMargin = 12;
+    const rightMargin = 12;
+    const topMargin = 18;
+    const usableWidth = pageWidth - leftMargin - rightMargin;
+    const compColWidth = usableWidth * 0.22;
+    const levelColWidth = (usableWidth - compColWidth) / 5;
+    let currentY = topMargin;
+
+    // === TITEL ===
+    const subjectFilter = document.getElementById('filterSubject')?.value?.trim() || '';
+    const gradeFilter = document.getElementById('filterGrade')?.value?.trim() || '';
+    const toolFilter = document.getElementById('filterTool')?.value?.trim().toLowerCase() || '';
+    const subjectText = subjectFilter ? subjectFilter : 'Alle Fächer';
+    let gradeText = gradeFilter ? gradeFilter : 'Alle Klassen';
+    const toolText = toolFilter ? ` | Tool: ${toolFilter}` : '';
+    const title = `${subjectText} | ${gradeText}${toolText}`;
+
+    doc.setFontSize(16);
+    doc.setTextColor(107, 70, 193);
+    doc.setFont('helvetica', 'bold');
+    doc.text(title, pageWidth / 2, currentY, { align: 'center' });
+    currentY += 7;
+
+    // === KOPFZEILE: Schulname links, Datum rechts ===
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.setFont('helvetica', 'italic');
+    const schoolName = localStorage.getItem('schoolName') || 'Deine Schule';
+    doc.text(schoolName, leftMargin, currentY - 8);
+    const exportDate = `Export: ${new Date().toLocaleDateString('de-DE')}`;
+    doc.text(exportDate, pageWidth - rightMargin, currentY - 8, { align: 'right' });
+    currentY += 5; // Abstand zur Tabelle
+
+    // === DATEN ===
+    const competences = [
+        "Suchen, Verarbeiten und Aufbewahren",
+        "Kommunizieren und Kooperieren",
+        "Produzieren und Präsentieren",
+        "Schützen und sicher Agieren",
+        "Problemlösen und Handeln",
+        "Analysieren und Reflektieren"
+    ];
+    const levels = ["Niveaustufe 1", "Niveaustufe 2", "Niveaustufe 3", "Niveaustufe 4", "Niveaustufe 5"];
+    const levelColors = [
+        [139, 195, 74], [76, 175, 80], [255, 193, 7], [255, 152, 0], [244, 67, 54]
+    ];
+
+    const matrix = {};
+    competences.forEach(c => {
+        matrix[c] = {};
+        levels.forEach(l => matrix[c][l] = []);
+    });
+
+    // === DATEN FÜLLEN ===
+    resources.forEach(r => {
+        const subject = r.subject?.trim();
+        const grade = r.grade?.trim();
+        const tool = r.tool?.trim().toLowerCase();
+        const comp = r.competence?.trim();
+        const level = r.level?.trim();
+        const topic = r.topic?.trim();
+        if (!comp || !level || !topic) return;
+
+        const matchesSubject = !subjectFilter || subject === subjectFilter;
+        const matchesGrade = !gradeFilter || grade === gradeFilter;
+        const matchesTool = !toolFilter || tool === toolFilter;
+
+        if (matchesSubject && matchesGrade && matchesTool) {
+            matrix[comp][level].push(`${topic}\nKlasse ${grade}${r.tool ? ` – ${r.tool}` : ''}`);
+        }
+    });
+
+    // === HELFER ===
+    const drawLine = (x1, y1, x2, y2) => {
+        doc.setDrawColor(180);
+        doc.setLineWidth(0.25);
+        doc.line(x1, y1, x2, y2);
+    };
+
+    const drawHeader = (y) => {
+        const h = 11;
+        let x = leftMargin;
+
+        doc.setFillColor(107, 70, 193);
+        doc.rect(x, y, compColWidth, h, 'F');
+        doc.setTextColor(255);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Kompetenz', x + 4, y + 7.5);
+        x += compColWidth;
+
+        levels.forEach((lvl, i) => {
+            doc.setFillColor(...levelColors[i]);
+            doc.rect(x, y, levelColWidth, h, 'F');
+            doc.setTextColor(255);
+            const lines = doc.splitTextToSize(lvl, levelColWidth - 8);
+            const lineHeight = 3.8;
+            const startY = y + (h - lines.length * lineHeight) / 2 + lineHeight;
+            doc.text(lines, x + levelColWidth / 2, startY, { align: 'center' });
+            x += levelColWidth;
+        });
+
+        doc.setDrawColor(120);
+        doc.setLineWidth(0.5);
+        doc.line(leftMargin, y + h, pageWidth - rightMargin, y + h);
+        return y + h;
+    };
+
+    // === HELFER: Zentrierter Text ===
+    const drawCenteredText = (textLines, x, y, width, height, lineHeight, isBold = false) => {
+        const totalTextHeight = textLines.length * lineHeight;
+        const startY = y + (height - totalTextHeight) / 2 + lineHeight * 0.7;
+        doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+        doc.text(textLines, x, startY);
+    };
+
+    // === HEADER ===
+    let headerBottom = drawHeader(currentY);
+    currentY = headerBottom;
+
+    // === ZEILEN ===
+    const COMP_FONT_SIZE = 9.5;
+    const LEVEL_FONT_SIZE = 8.0;
+    const LINE_HEIGHT_FACTOR = 1.2;
+    const MIN_ROW_HEIGHT = 16;  // Erhöht
+    const LINE_HEIGHT_COMP = COMP_FONT_SIZE * LINE_HEIGHT_FACTOR * 0.3528;
+    const LINE_HEIGHT_LEVEL = LEVEL_FONT_SIZE * LINE_HEIGHT_FACTOR * 0.3528;
+
+    competences.forEach((comp) => {
+        // 1. Kompetenz-Text
+        const compLines = doc.splitTextToSize(comp, compColWidth - 8);
+        const compTextHeight = compLines.length * LINE_HEIGHT_COMP;
+
+        // 2. Level-Texte: Exakte Höhe
+        let maxLevelTextHeight = 0;
+        levels.forEach(l => {
+            const entries = matrix[comp][l];
+            const rawText = entries.length > 0 ? entries.join('\n\n') : '—';
+            const lines = doc.splitTextToSize(rawText, levelColWidth - 8);
+            const height = lines.length * LINE_HEIGHT_LEVEL;
+            if (height > maxLevelTextHeight) maxLevelTextHeight = height;
+        });
+
+        // 3. Zeilenhöhe
+        const maxTextHeight = Math.max(compTextHeight, maxLevelTextHeight);
+        const rowHeight = Math.max(MIN_ROW_HEIGHT, maxTextHeight + 8);  // +8 Puffer
+
+        // === SEITENUMBRUCH ===
+        if (currentY + rowHeight > pageHeight - 20) {
+            drawLine(leftMargin, headerBottom - 3, leftMargin, currentY);
+            drawLine(pageWidth - rightMargin, headerBottom - 3, pageWidth - rightMargin, currentY);
+            doc.addPage();
+            currentY = topMargin;
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text(`Fortsetzung – Seite ${doc.getCurrentPageInfo().pageNumber}`, pageWidth - rightMargin, currentY, { align: 'right' });
+            currentY += 8;
+            headerBottom = drawHeader(currentY);
+            currentY = headerBottom;
+        }
+
+        const rowY = currentY;
+        let x = leftMargin;
+
+        // === KOMPETENZ ZELLE ===
+        doc.setFillColor(248, 249, 255);
+        doc.rect(x, rowY, compColWidth, rowHeight, 'F');
+        doc.setTextColor(0);
+        doc.setFontSize(COMP_FONT_SIZE);
+        drawCenteredText(compLines, x + 4, rowY, compColWidth, rowHeight, LINE_HEIGHT_COMP, true);
+        drawLine(x + compColWidth, rowY, x + compColWidth, rowY + rowHeight);
+        x += compColWidth;
+
+        // === LEVEL ZELLEN ===
+        levels.forEach((lvl, j) => {
+            const entries = matrix[comp][lvl];
+            const rawText = entries.length > 0 ? entries.join('\n\n') : '—';
+            const lines = doc.splitTextToSize(rawText, levelColWidth - 8);
+
+            doc.setFillColor(255, 255, 255);
+            doc.rect(x, rowY, levelColWidth, rowHeight, 'F');
+            doc.setTextColor(60);
+            doc.setFontSize(LEVEL_FONT_SIZE);
+            drawCenteredText(lines, x + 4, rowY, levelColWidth, rowHeight, LINE_HEIGHT_LEVEL, false);
+
+            if (j < 4) drawLine(x + levelColWidth, rowY, x + levelColWidth, rowY + rowHeight);
+            x += levelColWidth;
+        });
+
+        drawLine(leftMargin, rowY + rowHeight, pageWidth - rightMargin, rowY + rowHeight);
+        currentY += rowHeight;
+    });
+
+    // === LETZTE LINIEN ===
+    drawLine(leftMargin, headerBottom - 3, leftMargin, currentY);
+    drawLine(pageWidth - rightMargin, headerBottom - 3, pageWidth - rightMargin, currentY);
+
+    // === SEITENZAHL ===
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(9);
+        doc.setTextColor(150);
+        doc.text(`Seite ${i}`, pageWidth - rightMargin, pageHeight - 8, { align: 'right' });
+    }
+
+    doc.save(`LernDashboard_Matrix_${new Date().toISOString().slice(0, 10)}.pdf`);
+}
 function exportMatrixExcel() {
     if (resources.length === 0) {
         showAlert("Keine Daten zum Exportieren!");
@@ -1646,7 +1866,7 @@ function exportMatrixExcel() {
         "Niveaustufe 5": "F44336"
     };
 
-    // === MATRIX ===
+    // === MATRIX AUFBAUEN ===
     const matrix = {};
     competences.forEach(c => {
         matrix[c] = {};
@@ -1672,11 +1892,11 @@ function exportMatrixExcel() {
         }
     });
 
-    // === DATEN ===
+    // === DATEN FÜR EXCEL ===
     const data = [];
-    data.push([title]);
-    data.push([]);
-    data.push(["Kompetenz", ...levels]);
+    data.push([title]);                     // A1: Titel
+    data.push([]);                          // A2: Leer
+    data.push(["Kompetenz", ...levels]);    // A3–F3: Header
 
     competences.forEach(comp => {
         const row = [comp];
@@ -1689,99 +1909,91 @@ function exportMatrixExcel() {
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(data);
-
-    // === ALLE ZELLEN: TEXT + WRAP + CENTER + SOLID FILL ===
     const range = XLSX.utils.decode_range(ws['!ref']);
+
+    // === BASISFORMATIERUNG (Text oben, Umbruch) ===
     for (let r = range.s.r; r <= range.e.r; ++r) {
         for (let c = range.s.c; c <= range.e.c; ++c) {
             const addr = XLSX.utils.encode_cell({ r, c });
             if (!ws[addr]) continue;
-            ws[addr].t = "s";
             ws[addr].s = ws[addr].s || {};
             ws[addr].s.alignment = {
                 wrapText: true,
-                vertical: "center",
-                horizontal: c === 0 ? "left" : "left"
+                vertical: "top",
+                horizontal: "left"
             };
-            ws[addr].s.font = ws[addr].s.font || { sz: 10 };
+            ws[addr].s.font = { sz: 10 };
         }
     }
 
-    // === SCHULNAME ===
+    // === SPALTENBREITEN ===
+    ws['!cols'] = [
+        { wch: 45 }, // Kompetenz
+        { wch: 38 }, { wch: 38 }, { wch: 38 }, { wch: 38 }, { wch: 38 }
+    ];
+
+    // === ZEILENHÖHEN ===
+    ws['!rows'] = [
+        { hpt: 30 },  // Titel
+        { hpt: 15 },  // Leer
+        { hpt: 50 }   // Header
+    ];
+    for (let r = 3; r <= 8; r++) {
+        let maxLines = 1;
+        for (let c = 1; c <= 5; c++) {
+            const addr = XLSX.utils.encode_cell({ r, c });
+            if (!ws[addr] || ws[addr].v === '—') continue;
+            const lines = (ws[addr].v.match(/\n\n/g) || []).length + 1;
+            if (lines > maxLines) maxLines = lines;
+        }
+        ws['!rows'][r] = { hpt: Math.min(45 + (maxLines * 36), 500) };
+    }
+
+    // === TITEL (A1) ===
+    const titleAddr = XLSX.utils.encode_cell({ r: 0, c: 0 });
+    ws[titleAddr].s = {
+        font: { bold: true, sz: 14, color: { rgb: "333333" } },
+        alignment: { horizontal: "left", vertical: "top" }
+    };
+
+    // === SCHULNAME (rechts oben, z. B. F1) ===
     const schoolAddr = XLSX.utils.encode_cell({ r: 0, c: 5 });
     ws[schoolAddr] = { v: localStorage.getItem('schoolName') || 'Deine Schule', t: "s" };
     ws[schoolAddr].s = {
         font: { italic: true, color: { rgb: "666666" }, sz: 11 },
-        alignment: { horizontal: "right", vertical: "center", wrapText: true }
+        alignment: { horizontal: "right", vertical: "top" }
     };
 
-    // === SPALTENBREITEN (BREITER FÜR BESSERES WRAPPING) ===
-    ws['!cols'] = [
-        { wch: 45 },
-        { wch: 40 }, { wch: 40 }, { wch: 40 }, { wch: 40 }, { wch: 40 }
-    ];
-
-    // === DYNAMISCHE ZEILENHÖHEN (MIT MEHR PADDING) ===
-    ws['!rows'] = [
-        { hpt: 45 }, // Titel (höher)
-        { hpt: 18 }, // Leer
-        { hpt: 40 }  // Header (höher)
-    ];
-
-    for (let r = 3; r <= 8; r++) {
-        let maxCount = 0;
-        for (let c = 1; c <= 5; c++) {
-            const addr = XLSX.utils.encode_cell({ r, c });
-            if (!ws[addr] || ws[addr].v === '—') continue;
-            const count = (ws[addr].v.match(/\n\n/g) || []).length + 1;
-            if (count > maxCount) maxCount = count;
-        }
-        const height = 45 + (maxCount * 40); // Mehr Basis + Padding pro Eintrag
-        ws['!rows'][r] = { hpt: Math.min(height, 500) }; // Max 500pt
-    }
-
-    // === MERGE TITEL ===
-    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }];
-
-    // === TITEL ===
-    const titleAddr = XLSX.utils.encode_cell({ r: 0, c: 0 });
-    ws[titleAddr].s = {
-        font: { bold: true, sz: 18, color: { rgb: "FFFFFF" } }, // Weiße Schrift
+    // === HEADER: "Kompetenz" (A3) ===
+    const compHeaderAddr = XLSX.utils.encode_cell({ r: 2, c: 0 });
+    ws[compHeaderAddr].s = {
         fill: { patternType: "solid", fgColor: { rgb: "6B46C1" } },
-        alignment: { horizontal: "center", vertical: "center", wrapText: true }
+        font: { bold: true, color: { rgb: "FFFFFF" }, sz: 12 },
+        alignment: { horizontal: "center", vertical: "top", wrapText: true }
     };
 
-    // === HEADER ===
-    for (let c = 0; c <= 5; c++) {
-        const addr = XLSX.utils.encode_cell({ r: 2, c });
-        if (!ws[addr]) continue;
-        if (c === 0) {
-            ws[addr].s = {
-                fill: { patternType: "solid", fgColor: { rgb: "6B46C1" } },
-                font: { bold: true, color: { rgb: "FFFFFF" }, sz: 12 },
-                alignment: { horizontal: "center", vertical: "center", wrapText: true }
-            };
-        } else {
-            const level = levels[c - 1];
-            ws[addr].s = {
-                fill: { patternType: "solid", fgColor: { rgb: levelRGB[level] } },
-                font: { bold: true, color: { rgb: "FFFFFF" }, sz: 12 },
-                alignment: { horizontal: "center", vertical: "center", wrapText: true }
-            };
-        }
-    }
+    // === HEADER: Niveaustufen (B3–F3) ===
+    levels.forEach((lvl, idx) => {
+        const addr = XLSX.utils.encode_cell({ r: 2, c: idx + 1 });
+        ws[addr].s = {
+            fill: { patternType: "solid", fgColor: { rgb: levelRGB[lvl] } },
+            font: { bold: true, color: { rgb: "FFFFFF" }, sz: 12 },
+            alignment: { horizontal: "center", vertical: "top", wrapText: true }
+        };
+    });
 
-    // === DATENZELLEN ===
+    // === KOMPETENZNAMEN (A4–A9) ===
+    competences.forEach((_, idx) => {
+        const addr = XLSX.utils.encode_cell({ r: idx + 3, c: 0 });
+        ws[addr].s = {
+            fill: { patternType: "solid", fgColor: { rgb: "F8F9FF" } },
+            font: { bold: true, sz: 11 },
+            alignment: { horizontal: "left", vertical: "top", wrapText: true }
+        };
+    });
+
+    // === DATENZELLEN (B4–F9) ===
     for (let r = 3; r <= 8; r++) {
-        const compAddr = XLSX.utils.encode_cell({ r, c: 0 });
-        if (ws[compAddr]) {
-            ws[compAddr].s = {
-                fill: { patternType: "solid", fgColor: { rgb: "F8F9FF" } },
-                font: { bold: true, sz: 11 },
-                alignment: { horizontal: "left", vertical: "center", wrapText: true }
-            };
-        }
-
         for (let c = 1; c <= 5; c++) {
             const addr = XLSX.utils.encode_cell({ r, c });
             if (!ws[addr]) continue;
@@ -1794,11 +2006,12 @@ function exportMatrixExcel() {
                     italic: isEmpty,
                     sz: 10
                 },
-                alignment: { horizontal: "left", vertical: "center", wrapText: true }
+                alignment: { horizontal: "left", vertical: "top", wrapText: true }
             };
         }
     }
 
+    // === EXPORT ===
     XLSX.utils.book_append_sheet(wb, ws, "LernMatrix");
     const today = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(wb, `LernDashboard_Matrix_${today}.xlsx`);
