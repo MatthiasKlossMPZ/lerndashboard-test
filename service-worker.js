@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lerndashboard-v47'; // Erhöhe bei jedem Update!
+const CACHE_NAME = 'lerndashboard-v47'; // Erhöhe bei Update!
 
 const urlsToCache = [
   '/',
@@ -7,41 +7,31 @@ const urlsToCache = [
   'edit-resource.html',
   'manifest.json',
   'icon-192.png',
-  'icon-512.png',
+  'icon-512.png'
 ];
 
-// INSTALL: Cache alles – mit Fehlerbehandlung
+// INSTALL
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        // Versuche zu cachen, aber ignoriere Fehler
-        return cache.addAll(urlsToCache).catch(err => {
-          console.warn('[SW] Einige Dateien konnten nicht gecacht werden (offline?):', err);
-          // Cache trotzdem öffnen
-          return cache;
-        });
-      })
+      .then(cache => cache.addAll(urlsToCache).catch(() => cache))
       .then(() => self.skipWaiting())
   );
 });
 
-// ACTIVATE: Alte Caches löschen & sofort übernehmen
+// ACTIVATE
 self.addEventListener('activate', event => {
   event.waitUntil(
-    Promise.all([
-      caches.keys().then(names => {
-        return Promise.all(
-          names.filter(name => name !== CACHE_NAME)
-               .map(name => caches.delete(name))
-        );
-      }),
-      self.clients.claim() // Sofort Clients übernehmen
-    ])
+    caches.keys().then(names =>
+      Promise.all(
+        names.filter(name => name !== CACHE_NAME)
+             .map(name => caches.delete(name))
+      )
+    ).then(() => self.clients.claim())
   );
 });
 
-// FETCH: Aus Cache, fallback to network
+// FETCH
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
@@ -49,9 +39,9 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// NEU: Höre auf Messages vom Client (z.B. für force-skipWaiting)
+// MESSAGE
 self.addEventListener('message', event => {
-  if (event.data.action === 'skipWaiting') {
+  if (event.data?.action === 'skipWaiting') {
     self.skipWaiting();
   }
 });
