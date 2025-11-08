@@ -2229,9 +2229,9 @@ function printOptimized() {
     setTimeout(() => { container.innerHTML = originalContent; }, 500);
 }
 // === AUTOMATISCHE UPDATE-PRÜFUNG MIT GITHUB + SERVICE WORKER ===
-const CURRENT_VERSION = '1.5.2b';  // Muss mit HTML-Version übereinstimmen
+const CURRENT_VERSION = '1.5.2c';  // Muss mit HTML-Version übereinstimmen
 const GITHUB_REPO = 'matthiasklossmpz/lerndashboard-test';
-const UPDATE_CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24 Stunden
+const UPDATE_CHECK_INTERVAL = 60 * 1000; // 24 Stunden
 const LAST_CHECK_KEY = 'lastUpdateCheck';
 const PENDING_UPDATE_KEY = 'pendingUpdateVersion';
 
@@ -2462,7 +2462,7 @@ if ('serviceWorker' in navigator) {
 
      <!-- Version-Info -->
     <div class="version-info">
-        v1.5.2b – © Matthias Kloß MPZ NB
+        v1.5.2c – © Matthias Kloß MPZ NB
     </div>
 
     <!-- === LÖSCH-ANIMATION === -->
