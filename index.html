@@ -76,17 +76,32 @@
         background: var(--bg); color: var(--text);
     }
     .main { width: 100%; }
-    .content-wrapper {
-        display: flex;
-        gap: 20px;
-        margin-top: 20px;
-    }
-    .resources-container { flex: 1; min-width: 0; }
-    .sidebar {
-        width: 320px; background: var(--card); border-radius: 12px;
-        padding: 16px; box-shadow: var(--shadow); height: fit-content;
-        position: sticky; top: 20px; align-self: flex-start;
-    }
+.centered-button-wrapper {
+    display: flex;
+    justify-content: center;
+    margin: 6px 0 12px !important;   /* Kleiner Abstand oben/unten – einheitlich */
+    width: 100%;
+}
+.resources-container {
+    flex: 1 1 600px;           /* Mindestbreite 600px, wächst */
+    min-width: 0;              /* Verhindert Overflow */
+    order: 1;
+}
+
+.sidebar {
+    width: 340px !important;
+    min-width: 340px;
+    flex: 0 0 340px;
+    background: var(--card);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: var(--shadow);
+    position: sticky;
+    top: 20px;
+    align-self: flex-start;
+    order: 2;
+    margin-left: auto; /* Schiebt Sidebar ans rechte Ende */
+}
     .sidebar h3 { margin: 0 0 16px; color: var(--primary); font-size: 16px; text-align: center; }
     .stat-bar { margin: 12px 0; }
     .stat-bar label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; color: var(--text-light); }
@@ -233,7 +248,12 @@
 #schoolButton[data-set="true"]:hover {
     box-shadow: 0 12px 28px rgba(46, 204, 113, 0.4) !important;
 }
-
+.content-wrapper {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    width: 100%;
+}
 /* ==================== MOBILE OPTIMIERUNGEN – FINAL ==================== */
 @media (max-width: 768px) {
     body { 
@@ -282,12 +302,6 @@
         padding: 10px;
     }
 
-    /* --- CONTENT: Ressourcen VOR Sidebar --- */
-    .content-wrapper {
-        flex-direction: column !important;
-        gap: 18px;
-    }
-
     /* --- SIDEBAR: KEIN STICKY MEHR, VOLLBREITE --- */
     .sidebar {
         width: 100% !important;
@@ -302,6 +316,25 @@
         order: 1;
         min-width: 0;
     }
+/* === MOBILE: Sidebar unter Ressourcen === */
+@media (max-width: 992px) {
+    .content-wrapper {
+        flex-direction: column;
+    }
+.resources-container,
+    .sidebar {
+        width: 100% !important;
+        min-width: 0 !important;
+        flex: none !important;
+        order: unset !important;
+        margin-left: 0 !important;
+    }
+    .sidebar {
+        position: static;
+        top: auto;
+        margin-top: 20px;
+    }
+}
     /* --- SCHULNAME-BUTTON (MOBILE) --- */
 #schoolButton {
     font-size: 12.5px;
@@ -400,8 +433,14 @@
 
     /* --- RESSOURCEN --- */
     .resource-item {
-        padding: 11px;
-        font-size: 14px;
+    margin: 0 0 16px 0;         /* Kein margin links/rechts */
+    padding: 16px;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    background: var(--card);
+    box-shadow: var(--shadow);
+    transition: transform 0.2s;
+    break-inside: avoid;       /* Verhindert Zeilenumbruch in Karten */
     }
     .action-icons { gap: 5px; }
     .action-icon { width: 30px; height: 30px; }
@@ -737,13 +776,16 @@
         <button class="btn" onclick="autoBackup()"
                 title="Erstellt sofort ein lokales Backup aller Daten">Backup jetzt</button>
     </div>
+    </div>
+
+<!-- ZENTRIERTE NEUE-RESSOURCE-BUTTON -->
+<div class="centered-button-wrapper">
+    <button class="new-resource-btn" onclick="openNewResourceWindow()"> Neue Ressource
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="margin-left: 6px;">
+            <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+    </button>
 </div>
-
-<button class="new-resource-btn" onclick="openNewResourceWindow()">
-    Neue Ressource
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-</button>
-
         <!-- RESSOURCEN + SIDEBAR -->
         <div class="content-wrapper">
             <div class="resources-container">
@@ -2390,70 +2432,28 @@ if ('serviceWorker' in navigator) {
 // === CSV IMPORT – 100% SICHER & MIT DEBUG ===
 function importCSV(event) {
     const file = event.target.files[0];
-    if (!file) {
-        showAlert('Keine Datei ausgewählt!');
-        return;
-    }
-
-    console.log('Datei ausgewählt:', file.name, file.size, 'Bytes');
+    if (!file) return;
 
     const reader = new FileReader();
-
     reader.onload = function(e) {
-        console.log('FileReader.onload ausgelöst');
-
-        const result = e.target.result;
-        console.log('e.target.result Typ:', typeof result, 'Wert:', result);
-
-        // SICHERHEITSPRÜFUNG
-        if (!result) {
-            console.error('FileReader: result ist null/undefined');
-            showAlert('Datei ist leer oder konnte nicht gelesen werden.');
+        const csv = e.target.result;
+        if (!csv.trim()) {
+            showAlert('CSV-Datei ist leer!');
             return;
         }
-
-        if (typeof result !== 'string') {
-            console.error('FileReader: result ist kein String!', result);
-            showAlert('Datei hat ein ungültiges Format.');
-            return;
-        }
-
-        if (result.trim() === '') {
-            showAlert('Die CSV-Datei ist leer.');
-            return;
-        }
-
-        console.log('CSV-Inhalt (erste 200 Zeichen):', result.substring(0, 200));
-        showImportPreview(result.trim());
+        showImportPreview(csv);
     };
-
-    reader.onerror = function() {
-        console.error('FileReader.onerror');
-        showAlert('Fehler beim Lesen der Datei. Prüfe die Berechtigungen.');
-    };
-
     reader.readAsText(file, 'UTF-8');
-    console.log('FileReader.readAsText gestartet');
+    event.target.value = '';
 }
 
 // Vorschau-Popup
 function showImportPreview(csvString) {
-    console.log('showImportPreview aufgerufen mit String-Länge:', csvString.length);
-
-    // Nochmal prüfen
-    if (!csvString || csvString.trim() === '') {
-        showAlert('CSV ist leer!');
-        return;
-    }
-
     const lines = csvString.split('\n').map(l => l.trim()).filter(l => l);
-    if (lines.length === 0) {
-        showAlert('Keine Zeilen in der CSV gefunden.');
+    if (lines.length < 1) {
+        showAlert('Keine Daten in der CSV gefunden.');
         return;
     }
-
-    console.log('CSV-Zeilen:', lines.length);
-    console.log('Erste Zeile (Header):', lines[0]);
 
     const headers = parseCSVLine(lines[0]);
     const data = [];
@@ -2461,26 +2461,22 @@ function showImportPreview(csvString) {
     for (let i = 1; i < lines.length; i++) {
         const values = parseCSVLine(lines[i]);
         const row = {};
-        headers.forEach((h, idx) => {
-            row[h] = values[idx] || '';
-        });
-        if (row['Thema'] && row['Thema'].trim()) {
-            data.push(row);
-        }
+        headers.forEach((h, idx) => row[h] = (values[idx] || '').trim());
+        if (row['Thema']) data.push(row);
     }
 
     if (data.length === 0) {
-        showAlert('Keine gültigen Ressourcen in der CSV gefunden.');
+        showAlert('Keine gültigen Einträge mit "Thema" gefunden.');
         return;
     }
 
-    // Vorschau-HTML wie zuvor (unverändert)
+    // Vorschau-Tabelle
     let previewHtml = `<div style="max-height:300px;overflow-y:auto;margin:10px 0;"><table style="width:100%;border-collapse:collapse;font-size:13px;">`;
-    previewHtml += `<tr style="background:#6b46c1;color:white;"><th style="padding:6px;">${headers.join('</th><th style="padding:6px;">')}</th></tr>`;
+    previewHtml += `<tr style="background:#6b46c1;color:white;"><th style="padding:6px;">${headers.slice(0, 5).join('</th><th style="padding:6px;">')}</th></tr>`;
     data.slice(0, 5).forEach(row => {
-        previewHtml += `<tr style="border-bottom:1px solid #eee;"><td style="padding:6px;">${Object.values(row).map(escapeHtml).join('</td><td style="padding:6px;">')}</td></tr>`;
+        previewHtml += `<tr style="border-bottom:1px solid #eee;"><td style="padding:6px;">${Object.values(row).slice(0, 5).map(escapeHtml).join('</td><td style="padding:6px;">')}</td></tr>`;
     });
-    if (data.length > 5) previewHtml += `<tr><td colspan="${headers.length}" style="text-align:center;color:#666;padding:6px;font-style:italic;">... und ${data.length - 5} weitere</td></tr>`;
+    if (data.length > 5) previewHtml += `<tr><td colspan="5" style="text-align:center;color:#666;padding:6px;font-style:italic;">... und ${data.length - 5} weitere</td></tr>`;
     previewHtml += `</table></div>`;
 
     const modal = document.createElement('div');
@@ -2492,40 +2488,116 @@ function showImportPreview(csvString) {
             ${previewHtml}
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
                 <button onclick="this.closest('[style*=\'fixed\']').remove()" style="padding:8px 16px;border:1px solid #ccc;border-radius:8px;background:#f0f0f0;cursor:pointer;">Abbrechen</button>
-                <button id="confirmImport" style="padding:8px 16px;background:var(--primary);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;">Importieren</button>
+                <button id="confirmImportBtn" style="padding:8px 16px;background:var(--primary);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;">Importieren</button>
             </div>
         </div>
     `;
     document.body.appendChild(modal);
 
-    modal.querySelector('#confirmImport').onclick = () => {
+    modal.querySelector('#confirmImportBtn').onclick = () => {
         modal.remove();
-        importWithProgress(csvString, data.length);
+        performImport(data);
     };
+}
+function performImport(data) {
+    let imported = 0;
+    let duplicates = 0;
+
+    data.forEach(entry => {
+        const thema = entry['Thema']?.trim();
+        const fach = entry['Unterrichtsfach'] || '';
+        const klasse = entry['Klassenstufe'] || '';
+        const tool = entry['Digitales_Hilfsmittel'] || '';
+
+        const exists = resources.some(r =>
+            r.topic === thema && r.subject === fach && r.grade === klasse && r.tool === tool
+        );
+
+        if (!exists && thema) {
+            resources.push({
+                topic: thema,
+                subject: fach,
+                grade: klasse,
+                competence: entry['Kompetenzbereich'] || '',
+                level: entry['Niveaustufe'] || '',
+                tool: tool,
+                description: entry['Beschreibung'] || '',
+                favorite: false
+            });
+            imported++;
+        } else if (thema) {
+            duplicates++;
+        }
+    });
+
+    localStorage.setItem('resources', JSON.stringify(resources));
+    populateDropdowns();
+    applyFilters();
+    updateStats();
+    updateSubjectStats();
+
+    // Erfolgs-Popup
+    showFancyAlert(
+        imported > 0
+            ? `${imported} Ressource${imported > 1 ? 'n' : ''} importiert!`
+            : 'Keine neuen Ressourcen importiert.',
+        imported > 0 ? 'success' : 'warning',
+        duplicates > 0 ? `${duplicates} Duplikat${duplicates > 1 ? 'e' : ''} übersprungen.` : ''
+    );
+}
+function performImport(data) {
+    let imported = 0;
+    let duplicates = 0;
+
+    data.forEach(entry => {
+        const thema = entry['Thema']?.trim();
+        const fach = entry['Unterrichtsfach'] || '';
+        const klasse = entry['Klassenstufe'] || '';
+        const tool = entry['Digitales_Hilfsmittel'] || '';
+
+        const exists = resources.some(r =>
+            r.topic === thema && r.subject === fach && r.grade === klasse && r.tool === tool
+        );
+
+        if (!exists && thema) {
+            resources.push({
+                topic: thema,
+                subject: fach,
+                grade: klasse,
+                competence: entry['Kompetenzbereich'] || '',
+                level: entry['Niveaustufe'] || '',
+                tool: tool,
+                description: entry['Beschreibung'] || '',
+                favorite: false
+            });
+            imported++;
+        } else if (thema) {
+            duplicates++;
+        }
+    });
+
+    localStorage.setItem('resources', JSON.stringify(resources));
+    populateDropdowns();
+    applyFilters();
+    updateStats();
+    updateSubjectStats();
+
+    // Erfolgs-Popup
+    showFancyAlert(
+        imported > 0
+            ? `${imported} Ressource${imported > 1 ? 'n' : ''} importiert!`
+            : 'Keine neuen Ressourcen importiert.',
+        imported > 0 ? 'success' : 'warning',
+        duplicates > 0 ? `${duplicates} Duplikat${duplicates > 1 ? 'e' : ''} übersprungen.` : ''
+    );
 }
 
 // Eigentlicher Import mit Fortschritt
 function importWithProgress(csv, totalCount) {
     const modal = document.createElement('div');
-    modal.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);display:flex;justify-content:center;align-items:center;z-index:20000;`;
-    modal.innerHTML = `
-        <div style="background:var(--card);padding:32px;border-radius:20px;text-align:center;width:90%;max-width:420px;box-shadow:0 16px 48px rgba(0,0,0,0.3);transform:scale(0.9);opacity:0;transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s ease;">
-            <div style="width:80px;height:80px;margin:0 auto 20px;">
-                <svg width="80" height="80" viewBox="0 0 100 100">
-                    <circle cx="50" cy="50" r="44" fill="none" stroke="#e0e0e0" stroke-width="4"/>
-                    <circle id="progressCircle" cx="50" cy="50" r="44" fill="none" stroke="#6b46c1" stroke-width="4" stroke-dasharray="276.46" stroke-dashoffset="276.46" style="transition:stroke-dashoffset 1s ease;"/>
-                    <path id="checkMark" d="M30 50 L45 65 L70 35" fill="none" stroke="#27ae60" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" style="stroke-dasharray:100;stroke-dashoffset:100;"/>
-                </svg>
-            </div>
-            <p id="importTitle" style="font-size:19px;font-weight:700;color:var(--text);margin:0 0 8px;">Importiere...</p>
-            <p id="importSubtitle" style="font-size:14px;color:var(--text-light);margin:0;">0 von ${totalCount}</p>
-            <div style="margin-top:20px;height:6px;background:#e0e0e0;border-radius:3px;overflow:hidden;">
-                <div id="importProgress" style="width:0%;height:100%;background:#6b46c1;border-radius:3px;transition:width 0.8s ease;"></div>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
+    // ... (der Rest des Modal-HTML bleibt gleich, wie in deinem Code)
 
+    document.body.appendChild(modal);
     requestAnimationFrame(() => {
         modal.querySelector('div').style.transform = 'scale(1)';
         modal.querySelector('div').style.opacity = '1';
@@ -2538,36 +2610,51 @@ function importWithProgress(csv, totalCount) {
     const check = modal.querySelector('#checkMark');
 
     setTimeout(() => {
-        progressBar.style.width = '100%';
-        circle.style.strokeDashoffset = '0';
-    }, 100);
-
-    setTimeout(() => {
         try {
             const rows = csv.split('\n').map(r => r.trim()).filter(r => r);
+            if (rows.length < 1) throw new Error('Keine gültigen Zeilen gefunden.');
+
             const headers = parseCSVLine(rows[0]);
             let imported = 0;
+            let duplicates = 0;
 
             for (let i = 1; i < rows.length; i++) {
                 const values = parseCSVLine(rows[i]);
                 const entry = {};
-                headers.forEach((h, idx) => {
-                    entry[h] = values[idx] || '';
-                });
+                headers.forEach((h, idx) => entry[h] = values[idx] || '');
 
-                if (entry['Thema'] && entry['Thema'].trim()) {
+                const thema = entry['Thema']?.trim();
+                if (!thema) continue;
+
+                const fach = entry['Unterrichtsfach'] || '';
+                const klasse = entry['Klassenstufe'] || '';
+                const tool = entry['Digitales_Hilfsmittel'] || '';
+
+                const exists = resources.some(r =>
+                    r.topic === thema && r.subject === fach && r.grade === klasse && r.tool === tool
+                );
+
+                if (!exists) {
                     resources.push({
-                        topic: entry['Thema'].trim(),
-                        subject: entry['Unterrichtsfach'] || '',
-                        grade: entry['Klassenstufe'] || '',
+                        topic: thema,
+                        subject: fach,
+                        grade: klasse,
                         competence: entry['Kompetenzbereich'] || '',
                         level: entry['Niveaustufe'] || '',
-                        tool: entry['Digitales_Hilfsmittel'] || '',
+                        tool: tool,
                         description: entry['Beschreibung'] || '',
                         favorite: false
                     });
                     imported++;
+                } else {
+                    duplicates++;
                 }
+
+                // Realer Fortschritt
+                const percent = Math.round((i / (rows.length - 1)) * 100);
+                progressBar.style.width = `${percent}%`;
+                circle.style.strokeDashoffset = 276.46 * (1 - percent / 100);
+                subtitle.textContent = `${i} von ${rows.length - 1}`;
             }
 
             localStorage.setItem('resources', JSON.stringify(resources));
@@ -2576,23 +2663,28 @@ function importWithProgress(csv, totalCount) {
             updateStats();
             updateSubjectStats();
 
-            title.textContent = 'Import erfolgreich!';
+            title.textContent = 'Import abgeschlossen!';
             title.style.color = '#27ae60';
-            subtitle.textContent = `${imported} Ressourcen hinzugefügt`;
+            if (imported === 0) {
+                subtitle.textContent = `Keine neuen Ressourcen (Duplikate: ${duplicates})`;
+                check.style.stroke = '#f39c12';  // Gelb für Warnung
+            } else {
+                subtitle.textContent = `${imported} Ressourcen hinzugefügt (Duplikate: ${duplicates})`;
+            }
             check.style.strokeDashoffset = '0';
             check.style.animation = 'draw 0.6s ease forwards';
 
         } catch (err) {
-            console.error(err);
+            console.error('Import-Fehler:', err);
             title.textContent = 'Import fehlgeschlagen!';
             title.style.color = '#e74c3c';
-            subtitle.textContent = 'Fehler: ' + (err.message || 'Unbekannter Fehler');
+            subtitle.textContent = err.message || 'Unbekannter Fehler – prüfe CSV-Format.';
         }
 
         setTimeout(() => {
             modal.style.opacity = '0';
             setTimeout(() => modal.remove(), 400);
-        }, 1500);
+        }, 2000);  // Länger anzeigen für Lesbarkeit
     }, 300);
 }
 function updateSubjectStats() {
@@ -2650,7 +2742,85 @@ function parseCSVLine(line) {
     result.push(current);
     return result.map(s => s.trim().replace(/^"|"$/g, ''));
 }
+function showFancyAlert(title, type = 'info', subtitle = '') {
+    // Entferne alte Modals (sicherheitshalber)
+    document.querySelectorAll('[data-fancy-alert]').forEach(m => m.remove());
 
+    const modal = document.createElement('div');
+    modal.dataset.fancyAlert = 'true';
+    modal.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.6);
+        backdrop-filter: blur(8px);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 30000;
+        padding: 20px;
+        box-sizing: border-box;
+    `;
+
+    const colors = {
+        success: '#27ae60',
+        warning: '#f39c12',
+        info: '#6b46c1'
+    };
+
+    modal.innerHTML = `
+        <div style="
+            background: var(--card);
+            padding: 28px;
+            border-radius: 16px;
+            text-align: center;
+            max-width: 90%;
+            width: 380px;
+            box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+            animation: fadeIn 0.3s ease;
+        ">
+            <div style="margin: 0 auto 16px; width: 64px; height: 64px;">
+                <svg width="64" height="64" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="44" fill="none" stroke="#e0e0e0" stroke-width="4"/>
+                    <circle cx="50" cy="50" r="44" fill="none" stroke="${colors[type]}" stroke-width="4"
+                            stroke-dasharray="276.46" stroke-dashoffset="276.46"
+                            style="animation: drawCircle 1s ease forwards;"/>
+                    <path d="M30 50 L45 65 L70 35" fill="none" stroke="${colors[type]}" stroke-width="6"
+                          stroke-linecap="round" stroke-linejoin="round"
+                          style="stroke-dasharray:100; stroke-dashoffset:100; animation: draw 0.6s ease forwards 0.5s;"/>
+                </svg>
+            </div>
+            <p style="font-size: 18px; font-weight: 700; color: ${colors[type]}; margin: 0 0 8px;">
+                ${title}
+            </p>
+            ${subtitle ? `<p style="font-size: 14px; color: var(--text-light); margin: 0 0 20px; line-height: 1.5;">
+                ${subtitle}
+            </p>` : ''}
+            <button id="fancyAlertOK" style="
+                padding: 10px 24px;
+                background: ${colors[type]};
+                color: white;
+                border: none;
+                border-radius: 10px;
+                font-weight: 600;
+                font-size: 15px;
+                cursor: pointer;
+                min-width: 100px;
+                transition: all 0.2s;
+            " onmouseover="this.style.opacity='0.9'"
+                onmouseout="this.style.opacity='1'">
+                OK
+            </button>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Button direkt anhängen – KEIN this.closest!
+    modal.querySelector('#fancyAlertOK').onclick = () => {
+        modal.style.opacity = '0';
+        setTimeout(() => modal.remove(), 300);
+    };
+}
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
@@ -2909,7 +3079,13 @@ tr:last-child td {
         }
     }
 }
-
+/* === ZENTRIERTER BUTTON-WRAPPER === */
+.centered-button-wrapper {
+    display: flex;
+    justify-content: center;
+    margin: 6px 0 12px !important;   /* Kleiner Abstand oben/unten – einheitlich */
+    width: 100%;
+}
     </style>
 <!-- === BEARBEITUNGS-BESTÄTIGUNG (ANIMATION – OHNE TON) === -->
 <div id="editAnimation" style="
