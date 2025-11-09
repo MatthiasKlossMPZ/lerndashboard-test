@@ -722,23 +722,22 @@
                 </div>
             </div>
 
-            <!-- GRUPPE 2: Datenmanagement (unabhängig von Filtern) -->
-            <div class="export-group horizontal">
-                <h4 class="export-group-title">Datenmanagement</h4>
-                <div class="btn-row">
-                    <button class="btn print" onclick="printOptimized()"
-                            title="Druckt die aktuelle Ansicht (unabhängig von Filtern)">Drucken</button>
-                    <label class="btn import" title="Importiert neue Ressourcen aus einer CSV-Datei">
-                        <input type="file" accept=".csv" class="file-input" onchange="importCSV(event)">
-                        <span>Import</span>
-                    </label>
-                    <button class="btn template" onclick="exportTemplate()" 
-                            title="Lädt eine leere CSV-Vorlage zum Ausfüllen">Vorlage</button>
-                    <button class="btn" onclick="autoBackup()" 
-                            title="Erstellt sofort ein lokales Backup aller Daten">Backup jetzt</button>
-                </div>
-            </div>
-        </div>
+<!-- GRUPPE 2: Datenmanagement (unabhängig von Filtern) -->
+<div class="export-group horizontal">
+    <h4 class="export-group-title">Datenmanagement</h4>
+    <div class="btn-row">
+        <button class="btn print" onclick="printOptimized()"
+                title="Druckt die aktuelle Ansicht (unabhängig von Filtern)">Drucken</button>
+        <label class="btn import" title="Importiert neue Ressourcen aus einer CSV-Datei">
+            <input type="file" id="importFile" accept=".csv,text/csv" class="file-input" onchange="importCSV(event)">
+            <span>Import</span>
+        </label>
+        <button class="btn template" onclick="exportTemplate()"
+                title="Lädt eine leere CSV-Vorlage zum Ausfüllen">Vorlage</button>
+        <button class="btn" onclick="autoBackup()"
+                title="Erstellt sofort ein lokales Backup aller Daten">Backup jetzt</button>
+    </div>
+</div>
 
 <button class="new-resource-btn" onclick="openNewResourceWindow()">
     Neue Ressource
@@ -1181,102 +1180,33 @@ function deleteResource(i) {
         });
     }
 // === CSV-PARSER (ROBUST & KORREKT) ===
-function parseCSV(lines) {
-    const result = { header: [], data: [] };
-    if (lines.length === 0) return result;
-
-    // --- HEADER ---
-    let headerLine = lines[0];
-    result.header = splitCSVLine(headerLine);
-
-    // --- DATEN ---
-    for (let i = 1; i < lines.length; i++) {
-        const row = {};
-        const cells = splitCSVLine(lines[i]);
-        result.header.forEach((key, idx) => {
-            const normalizedKey = normalizeHeader(key);
-            row[normalizedKey] = (cells[idx] || '').trim();
-        });
-        if (row.Thema) result.data.push(row); // Nur Zeilen mit Thema
-    }
-
-    return result;
-}
-// === HELFER: CSV-ZEILE SPLITTEN (MIT ANFÜHRUNGSZEICHEN) ===
-function splitCSVLine(line) {
+function parseCSVLine(line) {
+    if (!line) return [];
     const result = [];
-    let cell = '';
+    let field = '';
     let inQuotes = false;
 
     for (let i = 0; i < line.length; i++) {
         const char = line[i];
-        const nextChar = line[i + 1];
+        const next = line[i + 1];
 
         if (char === '"') {
-            if (inQuotes && nextChar === '"') {
-                cell += '"';
-                i++; // Überspringe doppeltes ""
+            if (inQuotes && next === '"') {
+                field += '"';
+                i++;
             } else {
                 inQuotes = !inQuotes;
             }
         } else if (char === ',' && !inQuotes) {
-            result.push(cell);
-            cell = '';
+            result.push(field);
+            field = '';
         } else {
-            cell += char;
+            field += char;
         }
     }
-    result.push(cell);
-    return result;
+    result.push(field);
+    return result.map(s => s.replace(/^"|"$/g, '').trim());
 }
-// === HEADER NORMALISIERUNG (FÜR FLEXIBILITÄT) ===
-function normalizeHeader(str) {
-    return str
-        .replace(/Digitales Hilfsmittel/g, 'Digitales_Hilfsmittel')
-        .replace(/Beschreibung/g, 'Beschreibung')
-        .replace(/Niveaustufe/g, 'Niveaustufe')
-        .replace(/Klassenstufe/g, 'Klassenstufe')
-        .replace(/Kompetenzbereich/g, 'Kompetenzbereich')
-        .replace(/Unterrichtsfach/g, 'Unterrichtsfach')
-        .replace(/[^a-zA-Z0-9_ÄÖÜäöüß]/g, '_'); // Sonderzeichen → _
-}
-// === GLOBAL: importCSV für onchange ===
-window.importCSV = function(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const text = e.target.result;
-        const lines = text.split(/\r\n|\n|\r/).map(l => l.trim()).filter(l => l);
-        if (lines.length === 0) {
-            showAlert("Die CSV-Datei ist leer!");
-            return;
-        }
-        const parsed = parseCSV(lines);
-        if (!parsed || parsed.data.length === 0) {
-            showAlert("Keine gültigen Daten in der CSV gefunden!");
-            return;
-        }
-        const { header, data } = parsed;
-        const required = ['Thema', 'Unterrichtsfach', 'Klassenstufe', 'Kompetenzbereich'];
-        const missing = required.filter(col => !header.includes(col));
-        if (missing.length > 0) {
-            showAlert(
-                `Fehlende Pflichtspalten: ${missing.join(', ')}\n\n` +
-                `Gefundene Spalten: ${header.join(', ')}\n\n` +
-                `Tipp: Verwende die Vorlage!`
-            );
-            return;
-        }
-        const previewLines = data.slice(0, 8).map(row =>
-            `${row.Thema || ''} | ${row.Unterrichtsfach || ''} | ${row.Klassenstufe || ''} | ${row.Kompetenzbereich || ''}`
-        ).join('\n');
-        const total = data.length;
-        if (!confirm(`Vorschau (max. 8 Zeilen):\n\n${previewLines}\n${total > 8 ? `\n... und ${total - 8} weitere` : ''}\n\nImportieren? (${total} Ressourcen)`)) return;
-        importWithProgress(data);
-    };
-    reader.readAsText(file, 'UTF-8');
-};
 
 function exportTemplate() {
     const template = [
@@ -2456,6 +2386,275 @@ if ('serviceWorker' in navigator) {
       registerUpdateListener(); // ← Deine bestehende, korrekte Logik!
     })
     .catch(err => console.error('SW-Registrierung fehlgeschlagen:', err));
+}
+// === CSV IMPORT – 100% SICHER & MIT DEBUG ===
+function importCSV(event) {
+    const file = event.target.files[0];
+    if (!file) {
+        showAlert('Keine Datei ausgewählt!');
+        return;
+    }
+
+    console.log('Datei ausgewählt:', file.name, file.size, 'Bytes');
+
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+        console.log('FileReader.onload ausgelöst');
+
+        const result = e.target.result;
+        console.log('e.target.result Typ:', typeof result, 'Wert:', result);
+
+        // SICHERHEITSPRÜFUNG
+        if (!result) {
+            console.error('FileReader: result ist null/undefined');
+            showAlert('Datei ist leer oder konnte nicht gelesen werden.');
+            return;
+        }
+
+        if (typeof result !== 'string') {
+            console.error('FileReader: result ist kein String!', result);
+            showAlert('Datei hat ein ungültiges Format.');
+            return;
+        }
+
+        if (result.trim() === '') {
+            showAlert('Die CSV-Datei ist leer.');
+            return;
+        }
+
+        console.log('CSV-Inhalt (erste 200 Zeichen):', result.substring(0, 200));
+        showImportPreview(result.trim());
+    };
+
+    reader.onerror = function() {
+        console.error('FileReader.onerror');
+        showAlert('Fehler beim Lesen der Datei. Prüfe die Berechtigungen.');
+    };
+
+    reader.readAsText(file, 'UTF-8');
+    console.log('FileReader.readAsText gestartet');
+}
+
+// Vorschau-Popup
+function showImportPreview(csvString) {
+    console.log('showImportPreview aufgerufen mit String-Länge:', csvString.length);
+
+    // Nochmal prüfen
+    if (!csvString || csvString.trim() === '') {
+        showAlert('CSV ist leer!');
+        return;
+    }
+
+    const lines = csvString.split('\n').map(l => l.trim()).filter(l => l);
+    if (lines.length === 0) {
+        showAlert('Keine Zeilen in der CSV gefunden.');
+        return;
+    }
+
+    console.log('CSV-Zeilen:', lines.length);
+    console.log('Erste Zeile (Header):', lines[0]);
+
+    const headers = parseCSVLine(lines[0]);
+    const data = [];
+
+    for (let i = 1; i < lines.length; i++) {
+        const values = parseCSVLine(lines[i]);
+        const row = {};
+        headers.forEach((h, idx) => {
+            row[h] = values[idx] || '';
+        });
+        if (row['Thema'] && row['Thema'].trim()) {
+            data.push(row);
+        }
+    }
+
+    if (data.length === 0) {
+        showAlert('Keine gültigen Ressourcen in der CSV gefunden.');
+        return;
+    }
+
+    // Vorschau-HTML wie zuvor (unverändert)
+    let previewHtml = `<div style="max-height:300px;overflow-y:auto;margin:10px 0;"><table style="width:100%;border-collapse:collapse;font-size:13px;">`;
+    previewHtml += `<tr style="background:#6b46c1;color:white;"><th style="padding:6px;">${headers.join('</th><th style="padding:6px;">')}</th></tr>`;
+    data.slice(0, 5).forEach(row => {
+        previewHtml += `<tr style="border-bottom:1px solid #eee;"><td style="padding:6px;">${Object.values(row).map(escapeHtml).join('</td><td style="padding:6px;">')}</td></tr>`;
+    });
+    if (data.length > 5) previewHtml += `<tr><td colspan="${headers.length}" style="text-align:center;color:#666;padding:6px;font-style:italic;">... und ${data.length - 5} weitere</td></tr>`;
+    previewHtml += `</table></div>`;
+
+    const modal = document.createElement('div');
+    modal.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);display:flex;justify-content:center;align-items:center;z-index:20000;`;
+    modal.innerHTML = `
+        <div style="background:var(--card);padding:24px;border-radius:16px;max-width:90%;width:600px;box-shadow:0 16px 48px rgba(0,0,0,0.3);">
+            <h3 style="margin:0 0 12px;color:var(--text);font-size:18px;">Import-Vorschau</h3>
+            <p style="margin:0 0 12px;color:var(--text-light);font-size:14px;">${data.length} Ressourcen gefunden</p>
+            ${previewHtml}
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+                <button onclick="this.closest('[style*=\'fixed\']').remove()" style="padding:8px 16px;border:1px solid #ccc;border-radius:8px;background:#f0f0f0;cursor:pointer;">Abbrechen</button>
+                <button id="confirmImport" style="padding:8px 16px;background:var(--primary);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;">Importieren</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.querySelector('#confirmImport').onclick = () => {
+        modal.remove();
+        importWithProgress(csvString, data.length);
+    };
+}
+
+// Eigentlicher Import mit Fortschritt
+function importWithProgress(csv, totalCount) {
+    const modal = document.createElement('div');
+    modal.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);display:flex;justify-content:center;align-items:center;z-index:20000;`;
+    modal.innerHTML = `
+        <div style="background:var(--card);padding:32px;border-radius:20px;text-align:center;width:90%;max-width:420px;box-shadow:0 16px 48px rgba(0,0,0,0.3);transform:scale(0.9);opacity:0;transition:transform 0.4s cubic-bezier(0.34,1.56,0.64,1), opacity 0.4s ease;">
+            <div style="width:80px;height:80px;margin:0 auto 20px;">
+                <svg width="80" height="80" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="44" fill="none" stroke="#e0e0e0" stroke-width="4"/>
+                    <circle id="progressCircle" cx="50" cy="50" r="44" fill="none" stroke="#6b46c1" stroke-width="4" stroke-dasharray="276.46" stroke-dashoffset="276.46" style="transition:stroke-dashoffset 1s ease;"/>
+                    <path id="checkMark" d="M30 50 L45 65 L70 35" fill="none" stroke="#27ae60" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" style="stroke-dasharray:100;stroke-dashoffset:100;"/>
+                </svg>
+            </div>
+            <p id="importTitle" style="font-size:19px;font-weight:700;color:var(--text);margin:0 0 8px;">Importiere...</p>
+            <p id="importSubtitle" style="font-size:14px;color:var(--text-light);margin:0;">0 von ${totalCount}</p>
+            <div style="margin-top:20px;height:6px;background:#e0e0e0;border-radius:3px;overflow:hidden;">
+                <div id="importProgress" style="width:0%;height:100%;background:#6b46c1;border-radius:3px;transition:width 0.8s ease;"></div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    requestAnimationFrame(() => {
+        modal.querySelector('div').style.transform = 'scale(1)';
+        modal.querySelector('div').style.opacity = '1';
+    });
+
+    const progressBar = modal.querySelector('#importProgress');
+    const circle = modal.querySelector('#progressCircle');
+    const title = modal.querySelector('#importTitle');
+    const subtitle = modal.querySelector('#importSubtitle');
+    const check = modal.querySelector('#checkMark');
+
+    setTimeout(() => {
+        progressBar.style.width = '100%';
+        circle.style.strokeDashoffset = '0';
+    }, 100);
+
+    setTimeout(() => {
+        try {
+            const rows = csv.split('\n').map(r => r.trim()).filter(r => r);
+            const headers = parseCSVLine(rows[0]);
+            let imported = 0;
+
+            for (let i = 1; i < rows.length; i++) {
+                const values = parseCSVLine(rows[i]);
+                const entry = {};
+                headers.forEach((h, idx) => {
+                    entry[h] = values[idx] || '';
+                });
+
+                if (entry['Thema'] && entry['Thema'].trim()) {
+                    resources.push({
+                        topic: entry['Thema'].trim(),
+                        subject: entry['Unterrichtsfach'] || '',
+                        grade: entry['Klassenstufe'] || '',
+                        competence: entry['Kompetenzbereich'] || '',
+                        level: entry['Niveaustufe'] || '',
+                        tool: entry['Digitales_Hilfsmittel'] || '',
+                        description: entry['Beschreibung'] || '',
+                        favorite: false
+                    });
+                    imported++;
+                }
+            }
+
+            localStorage.setItem('resources', JSON.stringify(resources));
+            populateDropdowns();
+            applyFilters();
+            updateStats();
+            updateSubjectStats();
+
+            title.textContent = 'Import erfolgreich!';
+            title.style.color = '#27ae60';
+            subtitle.textContent = `${imported} Ressourcen hinzugefügt`;
+            check.style.strokeDashoffset = '0';
+            check.style.animation = 'draw 0.6s ease forwards';
+
+        } catch (err) {
+            console.error(err);
+            title.textContent = 'Import fehlgeschlagen!';
+            title.style.color = '#e74c3c';
+            subtitle.textContent = 'Fehler: ' + (err.message || 'Unbekannter Fehler');
+        }
+
+        setTimeout(() => {
+            modal.style.opacity = '0';
+            setTimeout(() => modal.remove(), 400);
+        }, 1500);
+    }, 300);
+}
+function updateSubjectStats() {
+    const filtered = getFilteredResources();
+    const count = filtered.reduce((a, r) => {
+        const subject = r.subject || 'Unbekannt';
+        a[subject] = (a[subject] || 0) + 1;
+        return a;
+    }, {});
+
+    const container = document.getElementById('statsFach');
+    if (!container) return;
+
+    container.innerHTML = '';
+    const max = Math.max(...Object.values(count), 1);
+
+    Object.entries(count)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([subject, value]) => {
+            const div = document.createElement('div');
+            div.className = 'stat-bar';
+            div.innerHTML = `
+                <label>${subject} <span class="bar-value">${value}</span></label>
+                <div class="bar-container">
+                    <div class="bar" style="width: ${(value / max * 100)}%"></div>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+}
+// === HILFSFUNKTIONEN ===
+function parseCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        const nextChar = line[i + 1];
+
+        if (char === '"') {
+            if (inQuotes && nextChar === '"') {
+                current += '"';
+                i++;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (char === ',' && !inQuotes) {
+            result.push(current);
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    result.push(current);
+    return result.map(s => s.trim().replace(/^"|"$/g, ''));
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
  </script>  <!-- ← ENDE SCRIPT -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
