@@ -1589,6 +1589,14 @@ function exportMatrixCSV() {
     ];
     const levels = ["Niveaustufe 1", "Niveaustufe 2", "Niveaustufe 3", "Niveaustufe 4", "Niveaustufe 5"];
 
+    // === FARBMAPS FÜR NIVEAUSTUFEN (GRÜN → ROT) ===
+const levelColors = {
+    'Niveaustufe 1': 'FF228B22', // Dunkelgrün
+    'Niveaustufe 2': 'FF32CD32', // Hellgrün
+    'Niveaustufe 3': 'FFFFFF00', // Gelb
+    'Niveaustufe 4': 'FFFFA500', // Orange
+    'Niveaustufe 5': 'FF8B0000'  // Dunkelrot
+};
     // === DATEN FÜR MATRIX (nur Fach, Klasse, Tool filtern) ===
     const matrix = {};
     competences.forEach(c => {
@@ -1888,6 +1896,30 @@ function exportMatrixExcel() {
 
     const levels = ["Niveaustufe 1", "Niveaustufe 2", "Niveaustufe 3", "Niveaustufe 4", "Niveaustufe 5"];
 
+    // === FARBEN ===
+    const levelColors = {
+        'Niveaustufe 1': 'FF90EE90',
+        'Niveaustufe 2': 'FF98FB98',
+        'Niveaustufe 3': 'FFFFFF00',
+        'Niveaustufe 4': 'FFFFA500',
+        'Niveaustufe 5': 'FFFF0000'
+    };
+    const headerColor   = 'FF6B46C1';
+    const contentColor  = 'FFF8F9FA';
+
+    // === FILTER-INFO ===
+    const subjectFilter = document.getElementById('subjectFilter')?.value || 'Alle Fächer';
+    const gradeFilter   = document.getElementById('gradeFilter')?.value || 'Alle Klassen';
+    const filterText = `${subjectFilter} | ${gradeFilter}`;
+
+    // === SCHULNAME & DATUM ===
+    const schoolName = localStorage.getItem('schoolName') || 'Campus';
+    const exportDate = new Date().toLocaleDateString('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    });
+
     // === Matrix aufbauen ===
     const matrix = {};
     competences.forEach(c => matrix[c] = {});
@@ -1901,21 +1933,70 @@ function exportMatrixExcel() {
         }
     });
 
-    // === ExcelJS Workbook ===
+    // === Workbook ===
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Kompetenzmatrix');
+
+    // === KOPFZEILE: A1 = Schule, B1–E1 = Filter, F1 = Datum ===
+    const headerTopRow = sheet.addRow(['', '', '', '', '', '']);
+    headerTopRow.height = 35;
+
+    // A1: Schulname
+    const schoolCell = headerTopRow.getCell(1);
+    schoolCell.value = schoolName;
+    schoolCell.font = { bold: true, size: 14, color: { argb: headerColor } };
+    schoolCell.alignment = { horizontal: 'left', vertical: 'middle' };
+    schoolCell.border = {
+        top: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+        left: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+        bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+        right: { style: 'thin', color: { argb: 'FFCCCCCC' } }
+    };
+
+    // B1–E1: Filter-Info
+    sheet.mergeCells('B1:E1');
+    const filterCell = sheet.getCell('B1');
+    filterCell.value = filterText;
+    filterCell.font = { bold: true, size: 14, color: { argb: headerColor } };
+    filterCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    filterCell.border = {
+        top: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+        left: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+        bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+        right: { style: 'thin', color: { argb: 'FFCCCCCC' } }
+    };
+
+    // F1: Exportdatum
+    const dateCell = headerTopRow.getCell(6);
+    dateCell.value = `Export: ${exportDate}`;
+    dateCell.font = { size: 12, color: { argb: 'FF666666' } };
+    dateCell.alignment = { horizontal: 'right', vertical: 'middle' };
+    dateCell.border = {
+        top: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+        left: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+        bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+        right: { style: 'thin', color: { argb: 'FFCCCCCC' } }
+    };
+
+    // === LEERZEILE ===
+    sheet.addRow([]);
 
     // === Header ===
     const headerRow = sheet.addRow(['Kompetenzbereich', ...levels]);
     headerRow.eachCell((cell, colNumber) => {
-        cell.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: colNumber === 1 ? 'FF6B46C1' : 'FF00BFFF' }
-        };
+        let fillColor = colNumber === 1 ? headerColor : levelColors[levels[colNumber - 2]];
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillColor } };
         cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
         cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        // Dünne Umrandung für alle Header-Zellen
+        cell.border = {
+            top: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+            left: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+            bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+            right: { style: 'thin', color: { argb: 'FFCCCCCC' } }
+        };
     });
+    headerRow.height = 45;
 
     // === Zeilen ===
     competences.forEach(comp => {
@@ -1924,19 +2005,38 @@ function exportMatrixExcel() {
 
         // Kompetenz-Spalte
         const compCell = row.getCell(1);
-        compCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF8C00' } };
+        compCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerColor } };
         compCell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
         compCell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        compCell.border = {
+            top: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+            left: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+            bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+            right: { style: 'thin', color: { argb: 'FFCCCCCC' } }
+        };
 
         // Inhaltszellen
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
             if (colNumber > 1) {
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8F9FA' } };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: contentColor } };
                 cell.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
+                if (cell.value && cell.value !== '–') {
+                    cell.value = '\n' + cell.value + '\n';
+                }
+                if (cell.value === '–') {
+                    cell.font = { color: { argb: 'FF999999' }, italic: true };
+                }
+                // Dünne Umrandung für alle Inhaltszellen
+                cell.border = {
+                    top: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+                    left: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+                    bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+                    right: { style: 'thin', color: { argb: 'FFCCCCCC' } }
+                };
             }
         });
 
-        // === Dynamische Zeilenhöhe (FEHLER BEHOBEN) ===
+        // Dynamische Zeilenhöhe
         let maxLines = 1;
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
             if (colNumber > 1 && cell.value) {
@@ -1945,7 +2045,7 @@ function exportMatrixExcel() {
                 if (lines > maxLines) maxLines = lines;
             }
         });
-        row.height = Math.max(60, maxLines * 20);
+        row.height = Math.max(70, maxLines * 22);
     });
 
     // === Spaltenbreiten ===
