@@ -2546,7 +2546,7 @@ if (!document.getElementById('app-animations')) {
 
 // === SERVICE WORKER REGISTRIERUNG MIT VERSION (dynamisch) ===
 if ('serviceWorker' in navigator) {
-  const swUrl = `service-worker.js?v=${CURRENT_VERSION}`;
+  const swUrl = `service-worker.js?v=${CURRENT_VERSION}&t=${Date.now()}`;
   navigator.serviceWorker.register(swUrl)
     .then(reg => {
       console.log('SW registriert mit Version:', CURRENT_VERSION);
