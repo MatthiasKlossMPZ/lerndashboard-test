@@ -831,6 +831,23 @@
         </svg>
     </button>
 </div>
+
+<!-- PWA INSTALLATIONS-BUTTON -->
+<div id="installContainer" style="display:none; text-align:center; margin:20px 0;">
+    <button onclick="installPWA()" style="
+        background: linear-gradient(135deg, #6b46c1, #7e5be0);
+        color: white; border: none; padding: 14px 28px;
+        border-radius: 12px; font-weight: 700; font-size: 16px;
+        cursor: pointer; box-shadow: 0 6px 16px rgba(107,70,193,0.3);
+        display: flex; align-items: center; gap: 8px; margin: 0 auto;
+    ">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+        App installieren
+    </button>
+</div>
+
         <!-- RESSOURCEN + SIDEBAR -->
         <div class="content-wrapper">
             <div class="resources-container">
@@ -2934,6 +2951,43 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+<!-- PWA INSTALLATIONS-HINWEIS -->
+    <script>
+    let deferredPrompt;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        console.log('PWA-Installation möglich!');
+        e.preventDefault();
+        deferredPrompt = e;
+
+        // Installations-Button anzeigen
+        const installContainer = document.getElementById('installContainer');
+        if (installContainer) {
+            installContainer.style.display = 'block';
+        }
+    });
+
+    function installPWA() {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+            if (choiceResult.outcome === 'accepted') {
+                console.log('PWA installiert');
+                document.getElementById('installContainer').style.display = 'none';
+            }
+            deferredPrompt = null;
+        });
+    }
+
+    // Optional: Button ausblenden, wenn App bereits installiert
+    window.addEventListener('appinstalled', () => {
+        const installContainer = document.getElementById('installContainer');
+        if (installContainer) installContainer.style.display = 'none';
+    });
+    </script>
+    <!-- ENDE: PWA INSTALLATIONS-HINWEIS -->
+
  </script>  <!-- ← ENDE SCRIPT -->
 
      <!-- Version-Info -->
