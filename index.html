@@ -51,12 +51,7 @@
     document.head.appendChild(jspdfScript);
 
     // Optional: Ladehinweis im Button anzeigen
-    document.addEventListener('DOMContentLoaded', () => {
-        const btn = document.getElementById('matrixPdfBtn');
-        if (btn) {
-            btn.textContent = 'Lade PDF...';
-        }
-    });
+
 </script>
 
     <!-- jsPDF + Autotable (für Tabellen in PDF) -->
@@ -972,6 +967,7 @@ function updateToolFilter() {
     }
 }
 
+
     function updateStats() {
         const filtered = getFilteredResources();
         document.getElementById('statTotal').textContent = filtered.length;
@@ -1077,6 +1073,33 @@ window.applyFilters = function() {
 document.addEventListener('DOMContentLoaded', () => {
     populateDropdowns();
     applyFilters();
+
+    // === TOOLTIPS: Schließen beim Klick (auch auf Button selbst) & Touch ===
+    let activeTooltipButton = null;
+
+    function showTooltip(btn) {
+        btn.style.setProperty('--show-tooltip', 'block');
+        activeTooltipButton = btn;
+    }
+
+    function hideTooltip() {
+        if (activeTooltipButton) {
+            activeTooltipButton.style.setProperty('--show-tooltip', 'none');
+            activeTooltipButton = null;
+        }
+    }
+
+    // Hover: Tooltip anzeigen
+    document.querySelectorAll('.btn[title]').forEach(btn => {
+        btn.addEventListener('mouseenter', () => showTooltip(btn));
+        btn.addEventListener('mouseleave', hideTooltip);
+        btn.addEventListener('focus', () => showTooltip(btn));
+        btn.addEventListener('blur', hideTooltip);
+    });
+
+    // Klick oder Touch: Tooltip schließen
+    document.addEventListener('click', hideTooltip);
+    document.addEventListener('touchstart', hideTooltip, { passive: true }); // ← WICHTIG!
 });
 
     function resetFilters() {
@@ -1591,8 +1614,8 @@ function exportMatrixCSV() {
 
     // === FARBMAPS FÜR NIVEAUSTUFEN (GRÜN → ROT) ===
 const levelColors = {
-    'Niveaustufe 1': 'FF228B22', // Dunkelgrün
-    'Niveaustufe 2': 'FF32CD32', // Hellgrün
+    'Niveaustufe 1': 'FF32CD32', // Dunkelgrün
+    'Niveaustufe 2': 'FF228B22', // Hellgrün
     'Niveaustufe 3': 'FFFFFF00', // Gelb
     'Niveaustufe 4': 'FFFFA500', // Orange
     'Niveaustufe 5': 'FF8B0000'  // Dunkelrot
@@ -1724,7 +1747,7 @@ async function exportMatrixPDF() {
     ];
     const levels = ["Niveaustufe 1","Niveaustufe 2","Niveaustufe 3","Niveaustufe 4","Niveaustufe 5"];
     const levelColors = [
-        [139,195,74],[76,175,80],[255,193,7],[255,152,0],[244,67,54]
+        [76,175,80],[139,195,74],[255,193,7],[255,152,0],[244,67,54] 
     ];
 
     const matrix = {};
@@ -1897,23 +1920,34 @@ function exportMatrixExcel() {
     const levels = ["Niveaustufe 1", "Niveaustufe 2", "Niveaustufe 3", "Niveaustufe 4", "Niveaustufe 5"];
 
     // === FARBEN ===
-    const levelColors = {
-        'Niveaustufe 1': 'FF90EE90',
-        'Niveaustufe 2': 'FF98FB98',
-        'Niveaustufe 3': 'FFFFFF00',
-        'Niveaustufe 4': 'FFFFA500',
-        'Niveaustufe 5': 'FFFF0000'
-    };
+  const levelColors = {
+    'Niveaustufe 1': 'FF4CAF50',  // #8BC34A → RGB(139,195,74)
+    'Niveaustufe 2': 'FF8BC34A',  // #4CAF50 → RGB(76,175,80)
+    'Niveaustufe 3': 'FFFFC107',  // #FFC107 → RGB(255,193,7)
+    'Niveaustufe 4': 'FFFF9800',  // #FF9800 → RGB(255,152,0)
+    'Niveaustufe 5': 'FFF44336'   // #F44336 → RGB(244,67,54)
+};
     const headerColor   = 'FF6B46C1';
     const contentColor  = 'FFF8F9FA';
 
     // === FILTER-INFO ===
-    const subjectFilter = document.getElementById('subjectFilter')?.value || 'Alle Fächer';
-    const gradeFilter   = document.getElementById('gradeFilter')?.value || 'Alle Klassen';
-    const filterText = `${subjectFilter} | ${gradeFilter}`;
+const subjectFilter = document.getElementById('filterSubject')?.value || 'Alle Fächer';
+const gradeFilter = document.getElementById('filterGrade')?.value || 'Alle Klassen';
+const competenceFilter = document.getElementById('filterCompetence')?.value || '';
+const levelFilter = document.getElementById('filterLevel')?.value || '';
+const toolFilter = document.getElementById('filterTool')?.value || '';
+
+// Immer Fach + Klasse, plus alle aktiven Filter
+let filterParts = [subjectFilter, gradeFilter];
+
+if (competenceFilter) filterParts.push(competenceFilter);
+if (levelFilter) filterParts.push(levelFilter);
+if (toolFilter) filterParts.push(`Tool: ${toolFilter}`);
+
+const filterText = filterParts.join(' | ');
 
     // === SCHULNAME & DATUM ===
-    const schoolName = localStorage.getItem('schoolName') || 'Campus';
+    const schoolName = localStorage.getItem('schoolName') || 'Deine Schule';
     const exportDate = new Date().toLocaleDateString('de-DE', {
         day: '2-digit',
         month: '2-digit',
@@ -3032,7 +3066,6 @@ tr:last-child td {
     position: relative;
     cursor: pointer;
 }
-
 .btn[title]:hover::after,
 .btn[title]:focus::after {
     content: attr(title);
@@ -3053,7 +3086,6 @@ tr:last-child td {
     white-space: normal;
     line-height: 1.4;
 }
-
 .btn[title]:hover::before,
 .btn[title]:focus::before {
     content: '';
@@ -3065,6 +3097,19 @@ tr:last-child td {
     border-top-color: #333;
     margin-bottom: 2px;
     z-index: 1000;
+}
+/* === TOOLTIP MIT CSS-VARIABLEN (für JS-Steuerung) === */
+.btn[title]::after,
+.btn[title]::before {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.btn[title][style*="--show-tooltip: block"]::after,
+.btn[title][style*="--show-tooltip: block"]::before {
+    opacity: 1;
+    visibility: visible;
 }
 
 /* === MOBILE === */
