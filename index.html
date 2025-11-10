@@ -854,61 +854,41 @@
         <symbol id="star-icon" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></symbol>
     </svg>
 
-    <script>
-    // === DATEN & KONFIG ===
-    let resources = JSON.parse(localStorage.getItem('resources') || '[]');
-    const levels = new Set(resources.map(r => r.level).filter(Boolean));
-const tools = new Set();
-resources.forEach(r => {
-    if (r.tool) {
-        const trimmed = r.tool.trim();
-        r.tool = trimmed; // Sicherstellen: immer getrimmt
-        tools.add(trimmed.toLowerCase()); // Nur für Filter klein
-    }
-});
+<script>
+// === 1. DATEN LADEN ===
+let resources = JSON.parse(localStorage.getItem('resources') || '[]');
+let tools = new Set(resources.map(r => r.tool?.trim().toLowerCase()).filter(Boolean));
+let dropdownsInitialized = false;
 
-    const subjects = ["AWT", "Astronomie", "Biologie", "Chemie", "Deutsch", "Englisch", "Französisch", "Geografie", "Geschichte", "Gesellschaftskunde", "Informatik", "Italienisch", "Kunst", "Mathematik", "Musik", "Naturwissenschaften", "Physik", "Plattdeutsch", "Russisch", "Spanisch", "Sozialkunde", "Sport", "Wirtschaft"];
-    const grades = Array.from({length: 13}, (_, i) => `Klasse ${i+1}`);
-    const competences = [
-        "Suchen, Verarbeiten und Aufbewahren",
-        "Kommunizieren und Kooperieren",
-        "Produzieren und Präsentieren",
-        "Schützen und sicher Agieren",
-        "Problemlösen und Handeln",
-        "Analysieren und Reflektieren"
-    ];
+// === DATEN FÜR DROPDOWNS ===
+const subjects = ['Deutsch','Mathematik','Englisch','Biologie','Chemie','Physik','Geschichte','Geografie','Politik','Wirtschaft','Informatik','Kunst','Musik','Sport','Ethik','Religion'];
+const grades = ['Klasse 5','Klasse 6','Klasse 7','Klasse 8','Klasse 9','Klasse 10','Klasse 11','Klasse 12','Klasse 13'];
+const competences = [
+    'Suchen, Verarbeiten und Aufbewahren',
+    'Kommunizieren und Kooperieren',
+    'Produzieren und Präsentieren',
+    'Schützen und sicher Agieren',
+    'Problemlösen und Handeln',
+    'Analysieren und Reflektieren'
+];
 
-    // === HILFSFUNKTIONEN ===
-    function escapeJs(str) {
-        if (!str) return '';
-        return str.replace(/'/g, "\\'").replace(/"/g, "\\\"");
-    }
+// === 2. ALLE FUNKTIONEN DEFINIEREN (VOR ALLEM ANDEREN!) ===
 
-    function setFilterAndApply(filterId, value) {
-        const select = document.getElementById(filterId);
-        if (select) {
-            select.value = value;
-            applyFilters();
-            document.querySelector('.filter-container').scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-    }
+// --- escapeJs ---
+function escapeJs(str) {
+    if (!str) return '';
+    return str.replace(/'/g, "\\'").replace(/"/g, "\\\"");
+}
 
-    // === DARK MODE ===
-    function toggleDarkMode() {
-        document.body.classList.toggle('dark');
-        localStorage.setItem('darkMode', document.body.classList.contains('dark'));
-    }
-    if (localStorage.getItem('darkMode') === 'true') toggleDarkMode();
-
-    function getSchoolName() {
+// --- getSchoolName ---
+function getSchoolName() {
     return localStorage.getItem('schoolName');
 }
 
-// === SCHULNAME FÜR PDF + BUTTON ===
+// --- updateSchoolButton ---
 function updateSchoolButton() {
     const btn = document.getElementById('schoolButton');
     if (!btn) return;
-
     const name = getSchoolName();
     if (name) {
         btn.textContent = name;
@@ -921,45 +901,21 @@ function updateSchoolButton() {
     }
 }
 
-function setSchoolName() {
-    const current = getSchoolName();
-    const name = prompt('Name der Schule eingeben:', current || '');
-    
-    if (name === null) return; // Abgebrochen
-    if (name.trim() === '') {
-        localStorage.removeItem('schoolName');
-        showAlert('Schulname entfernt.');
-    } else {
-        localStorage.setItem('schoolName', name.trim());
-        showAlert(`Schulname gespeichert:\n\n${name.trim()}`);
+// --- setFilterAndApply ---
+function setFilterAndApply(filterId, value) {
+    const select = document.getElementById(filterId);
+    if (select) {
+        select.value = value;
+        applyFilters();
+        document.querySelector('.filter-container').scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-    
-    updateSchoolButton(); // Button sofort aktualisieren
 }
 
-// Beim Laden der Seite: Button aktualisieren
-document.addEventListener('DOMContentLoaded', updateSchoolButton);
-
-    // === DROPDOWNS ===
-    function populateDropdowns() {
-        const addOptions = (id, options) => {
-            const select = document.getElementById(id);
-            if (select) {
-                select.innerHTML = '<option value="">Alle</option>';
-                options.forEach(opt => select.add(new Option(opt, opt)));
-            }
-        };
-        addOptions('filterSubject', subjects);
-        addOptions('filterGrade', grades);
-        addOptions('filterCompetence', competences);
-        updateToolFilter();
-    }
-
+// --- updateToolFilter ---
 function updateToolFilter() {
     const s = document.getElementById('filterTool');
     if (s) {
         s.innerHTML = '<option value="">Alle</option>';
-        // Original-Tools aus resources holen (für korrekte Großschreibung)
         const uniqueTools = [...new Set(resources.map(r => r.tool).filter(Boolean))];
         uniqueTools.sort((a, b) => a.localeCompare(b, 'de', { sensitivity: 'base' })).forEach(tool => {
             s.add(new Option(tool, tool.toLowerCase()));
@@ -967,15 +923,214 @@ function updateToolFilter() {
     }
 }
 
+// --- updateFilterHighlight ---
+function updateFilterHighlight() {
+    const container = document.querySelector('.filter-container');
+    if (!container) return;
+    const selects = container.querySelectorAll('select');
+    const search = container.querySelector('#searchTopic');
+    const isActive = Array.from(selects).some(s => s.value && s.value !== '') ||
+                     (search && search.value.trim() !== '');
+    container.classList.toggle('active', isActive);
+}
 
-    function updateStats() {
-        const filtered = getFilteredResources();
-        document.getElementById('statTotal').textContent = filtered.length;
-        document.getElementById('statFavorites').textContent = filtered.filter(r => r.favorite).length;
-        document.getElementById('statTools').textContent = [...new Set(filtered.map(r => r.tool).filter(Boolean))].length;
-        document.getElementById('statSubjects').textContent = [...new Set(filtered.map(r => r.subject))].length;
-        updateSubjectBarStats(filtered);
+// --- updateFilterStatus ---
+function updateFilterStatus() {
+    const isFiltered = getFilteredResources().length < resources.length;
+    const title = document.getElementById('filterExportTitle');
+    if (title) {
+        title.textContent = isFiltered ? 'Filter-Exporte (aktiv)' : 'Filter-Exporte';
+        title.style.color = isFiltered ? '#e74c3c' : 'var(--primary)';
     }
+    document.querySelectorAll('.filtered-export').forEach(btn => {
+        btn.classList.toggle('active', isFiltered);
+    });
+}
+
+// --- populateDropdowns ---
+function populateDropdowns() {
+    const addOptions = (id, options) => {
+        const select = document.getElementById(id);
+        if (select) {
+            select.innerHTML = '<option value="">Alle</option>';
+            options.forEach(opt => select.add(new Option(opt, opt)));
+        }
+    };
+    addOptions('filterSubject', subjects);
+    addOptions('filterGrade', grades);
+    addOptions('filterCompetence', competences);
+    updateToolFilter();
+}
+
+// --- applyFilters ---
+function applyFilters() {
+    const filtered = getFilteredResources();
+    displayResources(filtered);
+    updateStats();
+    updateFilterHighlight();
+    updateFilterStatus();
+}
+
+// --- getFilteredResources ---
+function getFilteredResources() {
+    const f = {
+        subject: document.getElementById('filterSubject')?.value?.toLowerCase() || '',
+        grade: document.getElementById('filterGrade')?.value || '',
+        competence: document.getElementById('filterCompetence')?.value || '',
+        level: document.getElementById('filterLevel')?.value || '',
+        tool: document.getElementById('filterTool')?.value?.toLowerCase() || '',
+        favorite: document.getElementById('filterFavorite')?.value === 'true',
+        topic: document.getElementById('searchTopic')?.value?.toLowerCase().trim() || ''
+    };
+    return resources.filter(r => {
+        const topic = r.topic?.toLowerCase() || '';
+        const subject = r.subject?.toLowerCase() || '';
+        const grade = r.grade || '';
+        const competence = r.competence || '';
+        const level = r.level || '';
+        const tool = r.tool?.toLowerCase() || '';
+        const isFavorite = r.favorite || false;
+        if (f.subject && subject !== f.subject) return false;
+        if (f.grade && grade !== f.grade) return false;
+        if (f.competence && competence !== f.competence) return false;
+        if (f.level && level !== f.level) return false;
+        if (f.tool && tool !== f.tool) return false;
+        if (f.favorite && !isFavorite) return false;
+        if (f.topic && !topic.includes(f.topic)) return false;
+        return true;
+    });
+}
+
+// --- displayResources ---
+function displayResources(list) {
+    const c = document.getElementById('resourcesList');
+    if (!c) return;
+    c.innerHTML = '';
+    list.forEach((r, i) => {
+        const realIndex = resources.findIndex(res =>
+            res.topic === r.topic &&
+            res.subject === r.subject &&
+            res.grade === r.grade &&
+            res.competence === r.competence &&
+            (res.tool || '') === (r.tool || '') &&
+            (res.description || '') === (r.description || '')
+        );
+        const d = document.createElement('div');
+        d.className = 'resource-item';
+        d.dataset.index = realIndex >= 0 ? realIndex : i;
+        d.innerHTML = `
+            <div class="resource-content">
+                <strong>${r.topic}</strong>
+                <span class="tag subject-tag" onclick="setFilterAndApply('filterSubject', '${escapeJs(r.subject)}')">${r.subject}</span>
+                <span class="tag grade-tag" onclick="setFilterAndApply('filterGrade', '${escapeJs(r.grade)}')">${r.grade}</span>
+                <span class="tag competence-tag" onclick="setFilterAndApply('filterCompetence', '${escapeJs(r.competence)}')">${r.competence}</span>
+                <span class="tag level-tag">${r.level || '—'}</span>
+               ${r.tool ? `<span class="tag tool-tag" onclick="setFilterAndApply('filterTool', '${escapeJs(r.tool.toLowerCase())}')">${escapeJs(r.tool)}</span>` : ''}
+                ${r.description ? `<div class="description">${r.description}</div>` : ''}
+            </div>
+            <div class="action-icons">
+                <div class="action-icon favorite-icon ${r.favorite ? 'active' : ''}"
+                     onclick="toggleFavorite(${realIndex})">
+                    <svg><use xlink:href="#star-icon"/></svg>
+                </div>
+                <div class="action-icon edit-icon"
+                     onclick="editResource(${realIndex})">
+                    <svg><use xlink:href="#edit-icon"/></svg>
+                </div>
+                <div class="action-icon delete-icon"
+                     onclick="deleteResource(${realIndex})">
+                    <svg><use xlink:href="#delete-icon"/></svg>
+                </div>
+            </div>`;
+        c.appendChild(d);
+    });
+}
+
+// --- updateStats ---
+function updateStats() {
+    const filtered = getFilteredResources();
+    document.getElementById('statTotal').textContent = filtered.length;
+    document.getElementById('statFavorites').textContent = filtered.filter(r => r.favorite).length;
+    document.getElementById('statTools').textContent = [...new Set(filtered.map(r => r.tool).filter(Boolean))].length;
+    document.getElementById('statSubjects').textContent = [...new Set(filtered.map(r => r.subject))].length;
+    updateSubjectBarStats(filtered);
+}
+
+// --- updateSubjectBarStats ---
+function updateSubjectBarStats(filtered) {
+    const count = filtered.reduce((a, r) => (a[r.subject] = (a[r.subject] || 0) + 1, a), {});
+    const container = document.getElementById('statsFach');
+    if (!container) return;
+    container.innerHTML = '';
+    const max = Math.max(...Object.values(count)) || 1;
+    Object.entries(count)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([k, v]) => {
+            const div = document.createElement('div');
+            div.className = 'stat-bar';
+            div.innerHTML = `
+                <label>${k} <span class="bar-value">${v}</span></label>
+                <div class="bar-container">
+                    <div class="bar" style="width:${(v / max * 100)}%"></div>
+                </div>`;
+            container.appendChild(div);
+        });
+}
+
+// --- checkForAppUpdate ---
+function checkForAppUpdate() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration().then(reg => {
+            if (reg) reg.update();
+        });
+    }
+}
+
+// --- registerUpdateListener ---
+function registerUpdateListener() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            window.location.reload();
+        });
+    }
+}
+
+// === 3. DOMContentLoaded (jetzt sicher!) ===
+document.addEventListener('DOMContentLoaded', () => {
+    const version = new URL(location.href).searchParams.get('v') || '1.5.2.8';
+    const versionEl = document.getElementById('versionInfo');
+    if (versionEl) versionEl.textContent = `v${version} – © Matthias Kloß MPZ NB`;
+
+    updateSchoolButton();  // ← Jetzt definiert!
+    updateFilterStatus();  // ← Jetzt definiert!
+
+    if (!dropdownsInitialized && document.getElementById('filterSubject')) {
+        populateDropdowns();
+        applyFilters();
+        dropdownsInitialized = true;
+    }
+
+    // Tooltips, Cache-Busting...
+});
+
+// === 4. UPDATE-CHECK ===
+document.addEventListener('DOMContentLoaded', () => {
+    registerUpdateListener();
+    checkForAppUpdate();
+    window.addEventListener('focus', checkForAppUpdate);
+});
+
+// === 5. SERVICE WORKER ===
+if ('serviceWorker' in navigator) {
+    const version = new URL(location.href).searchParams.get('v') || '1.5.2.8';
+    const swUrl = `service-worker.js?v=${version}`;
+    navigator.serviceWorker.register(swUrl)
+        .then(reg => {
+            console.log('SW registriert mit Version:', version);
+            registerUpdateListener();
+        })
+        .catch(err => console.error('SW-Registrierung fehlgeschlagen:', err));
+}
 
     function updateSubjectBarStats(filtered) {
         const count = filtered.reduce((a, r) => (a[r.subject] = (a[r.subject] || 0) + 1, a), {});
@@ -1048,7 +1203,6 @@ function updateFilterHighlight() {
     container.classList.toggle('active', isActive);
 }
 
-// === FILTER-STATUS FÜR EXPORT-BUTTONS ===
 function updateFilterStatus() {
     const isFiltered = getFilteredResources().length < resources.length;
     const title = document.getElementById('filterExportTitle');
@@ -1068,39 +1222,6 @@ window.applyFilters = function() {
     updateFilterHighlight();
     updateFilterStatus();
 };
-
-// Beim Laden prüfen
-document.addEventListener('DOMContentLoaded', () => {
-    populateDropdowns();
-    applyFilters();
-
-    // === TOOLTIPS: Schließen beim Klick (auch auf Button selbst) & Touch ===
-    let activeTooltipButton = null;
-
-    function showTooltip(btn) {
-        btn.style.setProperty('--show-tooltip', 'block');
-        activeTooltipButton = btn;
-    }
-
-    function hideTooltip() {
-        if (activeTooltipButton) {
-            activeTooltipButton.style.setProperty('--show-tooltip', 'none');
-            activeTooltipButton = null;
-        }
-    }
-
-    // Hover: Tooltip anzeigen
-    document.querySelectorAll('.btn[title]').forEach(btn => {
-        btn.addEventListener('mouseenter', () => showTooltip(btn));
-        btn.addEventListener('mouseleave', hideTooltip);
-        btn.addEventListener('focus', () => showTooltip(btn));
-        btn.addEventListener('blur', hideTooltip);
-    });
-
-    // Klick oder Touch: Tooltip schließen
-    document.addEventListener('click', hideTooltip);
-    document.addEventListener('touchstart', hideTooltip, { passive: true }); // ← WICHTIG!
-});
 
     function resetFilters() {
         ['filterSubject','filterGrade','filterCompetence','filterLevel','filterTool','filterFavorite'].forEach(id => {
@@ -1229,16 +1350,6 @@ function displayResources(list) {
             alert('Popup wurde blockiert – bitte erlauben!');
         }
     }
-// === NEUE RESSOURCE IM POPUP ===
-function openNewResourcePopup() {
-    const url = 'new-resource.html';
-    const popup = window.open(url, 'newResource', 'width=680,height=760,resizable=yes,scrollbars=yes');
-    if (popup) {
-        popup.focus();
-    } else {
-        alert('Popup wurde blockiert – bitte erlauben!');
-    }
-}
 
 function deleteResource(i) {
     const resource = resources[i];
@@ -1675,231 +1786,221 @@ const levelColors = {
 //  MATRIX → PDF 
 // ──────────────────────────────────────────────────────────────
 async function exportMatrixPDF() {
-    // 1. Gefilterte Daten holen
     const filtered = getFilteredResources();
     if (filtered.length === 0) {
         showAlert('Keine Daten für Matrix verfügbar!');
         return;
     }
 
-    // 2. Warten, bis jsPDF + autoTable geladen sind
     if (!window.jspdfLoaded) {
         showFancyAlert('jsPDF wird geladen...', 'info');
-        await new Promise(resolve => {
-            const check = setInterval(() => {
-                if (window.jspdfLoaded) {
-                    clearInterval(check);
+        await new Promise((resolve, reject) => {
+            if (window.jspdf) {
+                resolve();
+                return;
+            }
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+            script.onload = () => {
+                const autoScript = document.createElement('script');
+                autoScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
+                autoScript.onload = () => {
+                    window.jspdfLoaded = true;
                     resolve();
-                }
-            }, 50);
+                };
+                autoScript.onerror = reject;
+                document.head.appendChild(autoScript);
+            };
+            script.onerror = reject;
+            document.head.appendChild(script);
+        }).catch(err => {
+            console.error('jsPDF Laden fehlgeschlagen:', err);
+            showAlert('PDF-Bibliothek konnte nicht geladen werden. Bitte Seite neu laden.');
+            return;
         });
     }
 
-    // 3. jsPDF initialisieren
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('l', 'mm', 'a4');               // landscape
-    const pageWidth  = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'mm', 'a4');
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const leftMargin = 12;
+        const rightMargin = 12;
+        const topMargin = 18;
+        const usableWidth = pageWidth - leftMargin - rightMargin;
+        const compColWidth = usableWidth * 0.22;
+        const levelColWidth = (usableWidth - compColWidth) / 5;
+        let currentY = topMargin;
 
-    // ── Layout-Konstanten ─────────────────────────────────────
-    const leftMargin   = 12;
-    const rightMargin  = 12;
-    const topMargin    = 18;
-    const usableWidth  = pageWidth - leftMargin - rightMargin;
-    const compColWidth = usableWidth * 0.22;
-    const levelColWidth = (usableWidth - compColWidth) / 5;
-    let currentY = topMargin;
+        // Titel
+        const subjectFilter = document.getElementById('filterSubject')?.value?.trim() || '';
+        const gradeFilter = document.getElementById('filterGrade')?.value?.trim() || '';
+        const toolFilter = document.getElementById('filterTool')?.value?.trim().toLowerCase() || '';
+        const subjectText = subjectFilter ? subjectFilter : 'Alle Fächer';
+        const gradeText = gradeFilter ? gradeFilter : 'Alle Klassen';
+        const toolText = toolFilter ? ` | Tool: ${toolFilter}` : '';
+        const title = `${subjectText} | ${gradeText}${toolText}`;
+        doc.setFontSize(16);
+        doc.setTextColor(107, 70, 193);
+        doc.setFont('helvetica', 'bold');
+        doc.text(title, pageWidth / 2, currentY, { align: 'center' });
+        currentY += 7;
 
-    // ── Titel (dynamisch) ─────────────────────────────────────
-    const subjectFilter = document.getElementById('filterSubject')?.value?.trim() || '';
-    const gradeFilter   = document.getElementById('filterGrade')?.value?.trim()   || '';
-    const toolFilter    = document.getElementById('filterTool')?.value?.trim().toLowerCase() || '';
-
-    const subjectText = subjectFilter ? subjectFilter : 'Alle Fächer';
-    const gradeText   = gradeFilter   ? gradeFilter   : 'Alle Klassen';
-    const toolText    = toolFilter    ? ` | Tool: ${toolFilter}` : '';
-    const title       = `${subjectText} | ${gradeText}${toolText}`;
-
-    doc.setFontSize(16);
-    doc.setTextColor(107, 70, 193);
-    doc.setFont('helvetica', 'bold');
-    doc.text(title, pageWidth / 2, currentY, { align: 'center' });
-    currentY += 7;
-
-    // ── Schulname & Datum ─────────────────────────────────────
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.setFont('helvetica', 'italic');
-    const schoolName = localStorage.getItem('schoolName') || 'Deine Schule';
-    doc.text(schoolName, leftMargin, currentY - 8);
-    doc.text(`Export: ${new Date().toLocaleDateString('de-DE')}`,
-             pageWidth - rightMargin, currentY - 8, { align: 'right' });
-    currentY += 5;
-
-    // ── Daten aufbauen ───────────────────────────────────────
-    const competences = [
-        "Suchen, Verarbeiten und Aufbewahren",
-        "Kommunizieren und Kooperieren",
-        "Produzieren und Präsentieren",
-        "Schützen und sicher Agieren",
-        "Problemlösen und Handeln",
-        "Analysieren und Reflektieren"
-    ];
-    const levels = ["Niveaustufe 1","Niveaustufe 2","Niveaustufe 3","Niveaustufe 4","Niveaustufe 5"];
-    const levelColors = [
-        [76,175,80],[139,195,74],[255,193,7],[255,152,0],[244,67,54] 
-    ];
-
-    const matrix = {};
-    competences.forEach(c => {
-        matrix[c] = {};
-        levels.forEach(l => matrix[c][l] = []);
-    });
-
-    resources.forEach(r => {
-        const s = r.subject?.trim();
-        const g = r.grade?.trim();
-        const t = r.tool?.trim().toLowerCase();
-        const c = r.competence?.trim();
-        const l = r.level?.trim();
-        const topic = r.topic?.trim();
-        if (!c || !l || !topic) return;
-
-        const match = (!subjectFilter || s === subjectFilter) &&
-                      (!gradeFilter   || g === gradeFilter)   &&
-                      (!toolFilter    || t === toolFilter);
-        if (match) {
-            matrix[c][l].push(`${topic}\nKlasse ${g}${r.tool ? ` – ${r.tool}` : ''}`);
-        }
-    });
-
-    // ── Hilfsfunktionen ───────────────────────────────────────
-    const drawLine = (x1,y1,x2,y2) => {
-        doc.setDrawColor(180);
-        doc.setLineWidth(0.25);
-        doc.line(x1,y1,x2,y2);
-    };
-
-    const drawHeader = y => {
-        const h = 11;
-        let x = leftMargin;
-
-        // Kompetenz-Spalte
-        doc.setFillColor(107,70,193);
-        doc.rect(x, y, compColWidth, h, 'F');
-        doc.setTextColor(255);
+        // Schulname & Datum
         doc.setFontSize(10);
-        doc.setFont('helvetica','bold');
-        doc.text('Kompetenz', x+4, y+7.5);
-        x += compColWidth;
+        doc.setTextColor(100);
+        doc.setFont('helvetica', 'italic');
+        const schoolName = localStorage.getItem('schoolName') || 'Deine Schule';
+        doc.text(schoolName, leftMargin, currentY - 8);
+        doc.text(`Export: ${new Date().toLocaleDateString('de-DE')}`, pageWidth - rightMargin, currentY - 8, { align: 'right' });
+        currentY += 5;
 
-        // Level-Spalten
-        levels.forEach((lvl,i) => {
-            doc.setFillColor(...levelColors[i]);
-            doc.rect(x, y, levelColWidth, h, 'F');
+        // Daten aufbauen
+        const competences = [
+            "Suchen, Verarbeiten und Aufbewahren",
+            "Kommunizieren und Kooperieren",
+            "Produzieren und Präsentieren",
+            "Schützen und sicher Agieren",
+            "Problemlösen und Handeln",
+            "Analysieren und Reflektieren"
+        ];
+        const levels = ["Niveaustufe 1","Niveaustufe 2","Niveaustufe 3","Niveaustufe 4","Niveaustufe 5"];
+        const levelColors = [
+            [76,175,80],[139,195,74],[255,193,7],[255,152,0],[244,67,54]
+        ];
+        const matrix = {};
+        competences.forEach(c => {
+            matrix[c] = {};
+            levels.forEach(l => matrix[c][l] = []);
+        });
+        resources.forEach(r => {
+            const s = r.subject?.trim();
+            const g = r.grade?.trim();
+            const t = r.tool?.trim().toLowerCase();
+            const c = r.competence?.trim();
+            const l = r.level?.trim();
+            const topic = r.topic?.trim();
+            if (!c || !l || !topic) return;
+            const match = (!subjectFilter || s === subjectFilter) &&
+                          (!gradeFilter || g === gradeFilter) &&
+                          (!toolFilter || t === toolFilter);
+            if (match) {
+                matrix[c][l].push(`${topic}\nKlasse ${g}${r.tool ? ` – ${r.tool}` : ''}`);
+            }
+        });
+
+        // Hilfsfunktionen
+        const drawLine = (x1,y1,x2,y2) => {
+            doc.setDrawColor(180);
+            doc.setLineWidth(0.25);
+            doc.line(x1,y1,x2,y2);
+        };
+        const drawHeader = y => {
+            const h = 11;
+            let x = leftMargin;
+            doc.setFillColor(107,70,193);
+            doc.rect(x, y, compColWidth, h, 'F');
             doc.setTextColor(255);
-            const lines = doc.splitTextToSize(lvl, levelColWidth-8);
-            const lineH = 3.8;
-            const startY = y + (h - lines.length*lineH)/2 + lineH;
-            doc.text(lines, x + levelColWidth/2, startY, {align:'center'});
-            x += levelColWidth;
-        });
-
-        doc.setDrawColor(120);
-        doc.setLineWidth(0.5);
-        doc.line(leftMargin, y+h, pageWidth-rightMargin, y+h);
-        return y + h;
-    };
-
-    const drawCenteredText = (lines, x, y, w, h, lineH, bold=false) => {
-        const totalH = lines.length * lineH;
-        const startY = y + (h - totalH)/2 + lineH*0.7;
-        doc.setFont('helvetica', bold?'bold':'normal');
-        doc.text(lines, x+4, startY);
-    };
-
-    // ── Header zeichnen ───────────────────────────────────────
-    let headerBottom = drawHeader(currentY);
-    currentY = headerBottom;
-
-    // ── Zeilen zeichnen ───────────────────────────────────────
-    const COMP_FS = 9.5, LEVEL_FS = 8.0;
-    const LH_COMP = COMP_FS * 1.2 * 0.3528;
-    const LH_LEVEL = LEVEL_FS * 1.2 * 0.3528;
-    const MIN_ROW_H = 16;
-
-    competences.forEach(comp => {
-        // max. Text-Höhe ermitteln
-        const compLines = doc.splitTextToSize(comp, compColWidth-8);
-        const compH = compLines.length * LH_COMP;
-
-        let maxLevelH = 0;
-        levels.forEach(l => {
-            const raw = matrix[comp][l].length ? matrix[comp][l].join('\n\n') : '—';
-            const lines = doc.splitTextToSize(raw, levelColWidth-8);
-            const h = lines.length * LH_LEVEL;
-            if (h > maxLevelH) maxLevelH = h;
-        });
-
-        const rowH = Math.max(MIN_ROW_H, Math.max(compH, maxLevelH) + 8);
-
-        // Seitenumbruch?
-        if (currentY + rowH > pageHeight - 20) {
-            drawLine(leftMargin, headerBottom-3, leftMargin, currentY);
-            drawLine(pageWidth-rightMargin, headerBottom-3, pageWidth-rightMargin, currentY);
-            doc.addPage();
-            currentY = topMargin;
             doc.setFontSize(10);
-            doc.setTextColor(100);
-            doc.text(`Fortsetzung – Seite ${doc.getCurrentPageInfo().pageNumber}`, pageWidth - rightMargin, currentY, {align:'right'});
-            currentY += 8;
-            headerBottom = drawHeader(currentY);
-            currentY = headerBottom;
+            doc.setFont('helvetica','bold');
+            doc.text('Kompetenz', x+4, y+7.5);
+            x += compColWidth;
+            levels.forEach((lvl,i) => {
+                doc.setFillColor(...levelColors[i]);
+                doc.rect(x, y, levelColWidth, h, 'F');
+                doc.setTextColor(255);
+                const lines = doc.splitTextToSize(lvl, levelColWidth-8);
+                const lineH = 3.8;
+                const startY = y + (h - lines.length*lineH)/2 + lineH;
+                doc.text(lines, x + levelColWidth/2, startY, {align:'center'});
+                x += levelColWidth;
+            });
+            doc.setDrawColor(120);
+            doc.setLineWidth(0.5);
+            doc.line(leftMargin, y+h, pageWidth-rightMargin, y+h);
+            return y + h;
+        };
+        const drawCenteredText = (lines, x, y, w, h, lineH, bold=false) => {
+            const totalH = lines.length * lineH;
+            const startY = y + (h - totalH)/2 + lineH*0.7;
+            doc.setFont('helvetica', bold?'bold':'normal');
+            doc.text(lines, x+4, startY);
+        };
+
+        // Header zeichnen
+        let headerBottom = drawHeader(currentY);
+        currentY = headerBottom;
+
+        // Zeilen zeichnen
+        const COMP_FS = 9.5, LEVEL_FS = 8.0;
+        const LH_COMP = COMP_FS * 1.2 * 0.3528;
+        const LH_LEVEL = LEVEL_FS * 1.2 * 0.3528;
+        const MIN_ROW_H = 16;
+        competences.forEach(comp => {
+            const compLines = doc.splitTextToSize(comp, compColWidth-8);
+            const compH = compLines.length * LH_COMP;
+            let maxLevelH = 0;
+            levels.forEach(l => {
+                const raw = matrix[comp][l].length ? matrix[comp][l].join('\n\n') : '—';
+                const lines = doc.splitTextToSize(raw, levelColWidth-8);
+                const h = lines.length * LH_LEVEL;
+                if (h > maxLevelH) maxLevelH = h;
+            });
+            const rowH = Math.max(MIN_ROW_H, Math.max(compH, maxLevelH) + 8);
+            if (currentY + rowH > pageHeight - 20) {
+                drawLine(leftMargin, headerBottom-3, leftMargin, currentY);
+                drawLine(pageWidth-rightMargin, headerBottom-3, pageWidth-rightMargin, currentY);
+                doc.addPage();
+                currentY = topMargin;
+                doc.setFontSize(10);
+                doc.setTextColor(100);
+                doc.text(`Fortsetzung – Seite ${doc.getCurrentPageInfo().pageNumber}`, pageWidth - rightMargin, currentY, {align:'right'});
+                currentY += 8;
+                headerBottom = drawHeader(currentY);
+                currentY = headerBottom;
+            }
+            const rowY = currentY;
+            let x = leftMargin;
+            doc.setFillColor(248,249,255);
+            doc.rect(x, rowY, compColWidth, rowH, 'F');
+            doc.setTextColor(0);
+            doc.setFontSize(COMP_FS);
+            drawCenteredText(compLines, x, rowY, compColWidth, rowH, LH_COMP, true);
+            drawLine(x+compColWidth, rowY, x+compColWidth, rowY+rowH);
+            x += compColWidth;
+            levels.forEach((lvl, j) => {
+                const raw = matrix[comp][lvl].length ? matrix[comp][lvl].join('\n\n') : '—';
+                const lines = doc.splitTextToSize(raw, levelColWidth-8);
+                doc.setFillColor(255,255,255);
+                doc.rect(x, rowY, levelColWidth, rowH, 'F');
+                doc.setTextColor(60);
+                doc.setFontSize(LEVEL_FS);
+                drawCenteredText(lines, x, rowY, levelColWidth, rowH, LH_LEVEL);
+                if (j < 4) drawLine(x+levelColWidth, rowY, x+levelColWidth, rowY+rowH);
+                x += levelColWidth;
+            });
+            drawLine(leftMargin, rowY+rowH, pageWidth-rightMargin, rowY+rowH);
+            currentY += rowH;
+        });
+
+        // Abschlusslinien
+        drawLine(leftMargin, headerBottom-3, leftMargin, currentY);
+        drawLine(pageWidth-rightMargin, headerBottom-3, pageWidth-rightMargin, currentY);
+        const totalPages = doc.getNumberOfPages();
+        for (let i=1; i<=totalPages; i++) {
+            doc.setPage(i);
+            doc.setFontSize(9);
+            doc.setTextColor(150);
+            doc.text(`Seite ${i}`, pageWidth-rightMargin, pageHeight-8, {align:'right'});
         }
 
-        const rowY = currentY;
-        let x = leftMargin;
-
-        // Kompetenz-Zelle
-        doc.setFillColor(248,249,255);
-        doc.rect(x, rowY, compColWidth, rowH, 'F');
-        doc.setTextColor(0);
-        doc.setFontSize(COMP_FS);
-        drawCenteredText(compLines, x, rowY, compColWidth, rowH, LH_COMP, true);
-        drawLine(x+compColWidth, rowY, x+compColWidth, rowY+rowH);
-        x += compColWidth;
-
-        // Level-Zellen
-        levels.forEach((lvl, j) => {
-            const raw = matrix[comp][lvl].length ? matrix[comp][lvl].join('\n\n') : '—';
-            const lines = doc.splitTextToSize(raw, levelColWidth-8);
-            doc.setFillColor(255,255,255);
-            doc.rect(x, rowY, levelColWidth, rowH, 'F');
-            doc.setTextColor(60);
-            doc.setFontSize(LEVEL_FS);
-            drawCenteredText(lines, x, rowY, levelColWidth, rowH, LH_LEVEL);
-            if (j < 4) drawLine(x+levelColWidth, rowY, x+levelColWidth, rowY+rowH);
-            x += levelColWidth;
-        });
-
-        drawLine(leftMargin, rowY+rowH, pageWidth-rightMargin, rowY+rowH);
-        currentY += rowH;
-    });
-
-    // ── Abschlusslinien & Seitenzahlen ───────────────────────
-    drawLine(leftMargin, headerBottom-3, leftMargin, currentY);
-    drawLine(pageWidth-rightMargin, headerBottom-3, pageWidth-rightMargin, currentY);
-
-    const totalPages = doc.getNumberOfPages();
-    for (let i=1; i<=totalPages; i++) {
-        doc.setPage(i);
-        doc.setFontSize(9);
-        doc.setTextColor(150);
-        doc.text(`Seite ${i}`, pageWidth-rightMargin, pageHeight-8, {align:'right'});
+        doc.save(`LernDashboard_Matrix_${new Date().toISOString().slice(0,10)}.pdf`);
+        showFancyAlert('PDF erfolgreich erstellt!', 'success');
+    } catch (err) {
+        console.error('PDF-Erstellung fehlgeschlagen:', err);
+        showAlert('Fehler beim Erstellen der PDF. Bitte Seite neu laden und erneut versuchen.');
     }
-
-    // ── Download ─────────────────────────────────────────────
-    doc.save(`LernDashboard_Matrix_${new Date().toISOString().slice(0,10)}.pdf`);
 }
 function exportMatrixExcel() {
     const filtered = getFilteredResources();
@@ -2128,9 +2229,6 @@ function base64ToBlob(b64Data, contentType = '', sliceSize = 512) {
     return new Blob(byteArrays, { type: contentType });
 }
 
-// Beim Laden
-document.addEventListener('DOMContentLoaded', updateFilterStatus);
-
 // === BACKUP MIT MODAL + AUTOMATISCHER DOWNLOAD ===
 function autoBackup() {
     const allResources = JSON.parse(localStorage.getItem('resources') || '[]');
@@ -2247,100 +2345,168 @@ function escapeHtml(text) {
 }
 
 function printOptimized() {
-    // 1. Schulname setzen
     const schoolName = localStorage.getItem('schoolName') || 'Deine Schule';
-    const printSchoolEl = document.getElementById('printSchoolNameText');
-    if (printSchoolEl) {
-        printSchoolEl.textContent = schoolName;
-    }
+    const allResources = resources;
 
-    // 2. Gefilterte Ressourcen holen (deine bestehende Funktion!)
-    const filtered = getFilteredResources();
-    if (filtered.length === 0) {
-        showAlert('Keine Daten zum Drucken!\nTipp: Filter zurücksetzen oder Daten prüfen.');
+    if (allResources.length === 0) {
+        showFancyAlert('Keine Ressourcen zum Drucken.', 'warning');
         return;
     }
 
-    // 3. Tabelle generieren
-    let tableHtml = `
-        <div style="margin-bottom: 20mm;">
-            <h2 style="color: #6b46c1; text-align: center; margin-bottom: 10mm;">
-                LernDashboard Digital – Gefilterte Ressourcen
-            </h2>
-            <p style="text-align: center; color: #666; font-size: 10pt; margin-bottom: 15mm;">
-                Exportiert am: ${new Date().toLocaleDateString('de-DE')}
+    // --- Statistik berechnen ---
+    const subjectCount = allResources.reduce((a, r) => {
+        const s = r.subject || 'Unbekannt';
+        a[s] = (a[s] || 0) + 1;
+        return a;
+    }, {});
+
+    const uniqueTools = new Set(allResources.map(r => r.tool).filter(Boolean)).size;
+    const favorites = allResources.filter(r => r.favorite).length;
+
+    // --- HTML generieren ---
+    let printHtml = `
+        <div class="print-content" style="
+            font-family: 'Segoe UI', Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 12mm 10mm;
+            line-height: 1.35;
+            font-size: 10.5pt;
+            color: #000;
+        ">
+            <h1 style="
+                text-align: center;
+                color: #6b46c1;
+                margin: 0 0 8mm;
+                font-size: 16pt;
+                font-weight: 700;
+            ">
+                LernDashboard Digital – Alle Ressourcen
+            </h1>
+            <p style="
+                text-align: center;
+                color: #555;
+                margin: 0 0 12mm;
+                font-size: 10pt;
+            ">
+                Schule: <strong>${escapeHtml(schoolName)}</strong> | 
+                Exportiert: ${new Date().toLocaleDateString('de-DE')}
             </p>
-            <table style="width:100%; border-collapse: collapse; font-size: 10pt;">
-                <thead>
-                    <tr style="background: #6b46c1; color: white;">
-                        <th style="padding: 8px; text-align: left;">Thema</th>
-                        <th style="padding: 8px; text-align: left;">Fach</th>
-                        <th style="padding: 8px; text-align: left;">Klasse</th>
-                        <th style="padding: 8px; text-align: left;">Kompetenz</th>
-                        <th style="padding: 8px; text-align: left;">Niveau</th>
-                        <th style="padding: 8px; text-align: left;">Tool</th>
-                        <th style="padding: 8px; text-align: left;">Beschreibung</th>
-                    </tr>
-                </thead>
-                <tbody>`;
-    
-    filtered.forEach(r => {
-        tableHtml += `
-            <tr style="border-bottom: 1px solid #ddd;">
-                <td style="padding: 8px; vertical-align: top;">${escapeHtml(r.topic || '')}</td>
-                <td style="padding: 8px; vertical-align: top;">${escapeHtml(r.subject || '')}</td>
-                <td style="padding: 8px; vertical-align: top;">${escapeHtml(r.grade || '')}</td>
-                <td style="padding: 8px; vertical-align: top;">${escapeHtml(r.competence || '')}</td>
-                <td style="padding: 8px; vertical-align: top;">${escapeHtml(r.level || '')}</td>
-                <td style="padding: 8px; vertical-align: top;">${escapeHtml(r.tool || '')}</td>
-                <td style="padding: 8px; vertical-align: top; max-width: 200px;">${escapeHtml(r.description || '')}</td>
-            </tr>`;
+    `;
+
+    allResources.forEach((r, i) => {
+        printHtml += `
+            <div class="print-resource" style="
+                margin-bottom: 5mm;
+                padding-bottom: 4mm;
+                border-bottom: 1px solid #ddd;
+                page-break-inside: auto;
+                break-inside: auto;
+            ">
+                <h3 style="
+                    margin: 0 0 1.5mm;
+                    color: #6b46c1;
+                    font-size: 11.5pt;
+                    font-weight: 600;
+                ">
+                    ${i + 1}. ${escapeHtml(r.topic || '–')}
+                </h3>
+                <p style="
+                    margin: 1mm 0;
+                    font-size: 10pt;
+                    line-height: 1.25;
+                    color: #333;
+                ">
+                    <strong>Fach:</strong> ${escapeHtml(r.subject || '–')} | 
+                    <strong>Klasse:</strong> ${escapeHtml(r.grade || '–')} | 
+                    <strong>Kompetenz:</strong> ${escapeHtml(r.competence || '–')}
+                </p>
+                <p style="
+                    margin: 1mm 0;
+                    font-size: 10pt;
+                    line-height: 1.25;
+                    color: #333;
+                ">
+                    <strong>Niveau:</strong> ${escapeHtml(r.level || '–')} | 
+                    <strong>Tool:</strong> ${escapeHtml(r.tool || '–')}
+                </p>
+                ${r.description ? `
+                <div style="
+                    margin: 2mm 0 0;
+                    padding: 2mm 6mm;
+                    background: #f9f9f9;
+                    border-left: 3px solid #6b46c1;
+                    font-size: 10pt;
+                    line-height: 1.3;
+                    border-radius: 0 5px 5px 0;
+                    display: inline-block;
+                    max-width: 100%;
+                    box-sizing: border-box;
+                ">
+                    ${escapeHtml(r.description)}
+                </div>` : ''}
+            </div>
+        `;
     });
-    
-    tableHtml += `</tbody></table></div>`;
 
-    // 4. Inhalt temporär ersetzen
-    const container = document.querySelector('.resources-container');
-    const originalContent = container.innerHTML;
-    container.innerHTML = tableHtml;
+    // --- Statistik ---
+    printHtml += `
+        <div class="print-stats" style="
+            margin-top: 12mm;
+            padding-top: 8mm;
+            border-top: 2px solid #6b46c1;
+            page-break-before: avoid;
+        ">
+            <h2 style="
+                color: #6b46c1;
+                margin: 0 0 5mm;
+                font-size: 13pt;
+                font-weight: 600;
+            ">Statistik</h2>
+            <div style="
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 3mm 8mm;
+                font-size: 10pt;
+                margin-bottom: 6mm;
+            ">
+                <div><strong>Gesamt:</strong> ${allResources.length} Ressourcen</div>
+                <div><strong>Favoriten:</strong> ${favorites}</div>
+                <div><strong>Tools:</strong> ${uniqueTools}</div>
+                <div><strong>Fächer:</strong> ${Object.keys(subjectCount).length}</div>
+            </div>
+            <p style="margin: 0 0 3mm; font-size: 10pt;"><strong>Nach Fächern:</strong></p>
+            <ul style="
+                columns: 2;
+                column-gap: 10mm;
+                margin: 0;
+                padding-left: 12mm;
+                font-size: 9.5pt;
+                line-height: 1.25;
+            ">
+    `;
 
-    // 5. Drucken und zurücksetzen
+    Object.entries(subjectCount)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([subj, count]) => {
+            printHtml += `<li><strong>${escapeHtml(subj)}:</strong> ${count}</li>`;
+        });
+
+    printHtml += `</ul></div></div>`;
+
+    // --- In .main einfügen ---
+    const mainContainer = document.querySelector('.main');
+    const originalMain = mainContainer.innerHTML;
+
+    mainContainer.innerHTML = printHtml;
+
+    // --- Drucken ---
     window.print();
-    setTimeout(() => { container.innerHTML = originalContent; }, 500);
-}
-// === AUTOMATISCHE UPDATE-PRÜFUNG MIT GITHUB + SERVICE WORKER ===
-const CURRENT_VERSION = '1.5.2.5';  // Muss mit HTML-Version übereinstimmen
-const GITHUB_REPO = 'matthiasklossmpz/lerndashboard-test';
-const UPDATE_CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24 Stunden
-const LAST_CHECK_KEY = 'lastUpdateCheck';
-const PENDING_UPDATE_KEY = 'pendingUpdateVersion';
 
-let newServiceWorker = null;
-
-// Prüfe auf GitHub-Update
-async function checkForAppUpdate() {
-    if (!navigator.onLine) return;
-
-    const now = Date.now();
-    const lastCheck = localStorage.getItem(LAST_CHECK_KEY);
-    if (lastCheck && now - parseInt(lastCheck) < UPDATE_CHECK_INTERVAL) return;
-
-    try {
-        const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
-        if (!res.ok) return;
-
-        const data = await res.json();
-        const latestVersion = data.tag_name.replace(/^v/, ''); // "v1.3.6" → "1.3.6"
-
-        if (latestVersion !== CURRENT_VERSION) {
-            localStorage.setItem(PENDING_UPDATE_KEY, latestVersion);
-            showUpdateBanner(latestVersion);  
-        }
-
-        localStorage.setItem(LAST_CHECK_KEY, now.toString());
-    } catch (err) {
-        console.warn('Update-Check fehlgeschlagen:', err);
-    }
+    // --- Zurücksetzen ---
+    setTimeout(() => {
+        mainContainer.innerHTML = originalMain;
+    }, 500);
 }
 
 // === UPDATE BANNER – KLICKBAR & 10 SEKUNDEN ===
@@ -2390,19 +2556,14 @@ function showUpdateBanner(version) {
     document.body.appendChild(banner);
 
     // --- NUR HIER: skipWaiting + Reload ---
-    banner.querySelector('#updateNowBtn').onclick = () => {
-        banner.style.opacity = '0';
-        banner.style.transition = 'opacity 0.3s ease';
-
-        // NUR HIER skipWaiting!
-        if (newServiceWorker) {
-            newServiceWorker.postMessage({ action: 'skipWaiting' });
-        }
-
-        setTimeout(() => {
-            window.location.reload();
-        }, 500);
-    };
+banner.querySelector('#installUpdateBtn').onclick = () => {
+    banner.style.opacity = '0';
+    banner.style.transition = 'opacity 0.3s ease';
+    if (newServiceWorker) {
+        newServiceWorker.postMessage({ action: 'skipWaiting' });
+    }
+    setTimeout(() => window.location.reload(), 500);
+};
 
     // Schließen
     banner.querySelector('#closeBtn').onclick = () => {
@@ -2505,14 +2666,6 @@ function registerUpdateListener() {
   }
 }
 
-// Starte Prüfung
-document.addEventListener('DOMContentLoaded', () => {
-    registerUpdateListener();
-    checkForAppUpdate();
-
-    // Optional: Prüfe auch bei Fokus (wenn App im Hintergrund war)
-    window.addEventListener('focus', checkForAppUpdate);
-});
 // === EINMALIGE ANIMATIONEN ===
 if (!document.getElementById('app-animations')) {
     const style = document.createElement('style');
@@ -2526,28 +2679,17 @@ if (!document.getElementById('app-animations')) {
     `;
     document.head.appendChild(style);
 } 
-// === AUTOMATISCHER CACHE-BUSTING FÜR ALLE RESSOURCEN ===
-  document.addEventListener('DOMContentLoaded', () => {
-    const version = CURRENT_VERSION;
-    document.querySelectorAll('link[rel="stylesheet"], script[src], img[src]').forEach(el => {
-      const url = new URL(el.href || el.src, location.href);
-      if (url.origin === location.origin) {
-        url.searchParams.set('v', version);
-        if (el.href) el.href = url;
-        if (el.src) el.src = url;
-      }
-    });
-  });
 
 // === SERVICE WORKER REGISTRIERUNG MIT VERSION (dynamisch) ===
 if ('serviceWorker' in navigator) {
-  const swUrl = `service-worker.js?v=${CURRENT_VERSION}`;
-  navigator.serviceWorker.register(swUrl)
-    .then(reg => {
-      console.log('SW registriert mit Version:', CURRENT_VERSION);
-      registerUpdateListener(); // ← Deine bestehende, korrekte Logik!
-    })
-    .catch(err => console.error('SW-Registrierung fehlgeschlagen:', err));
+    const version = new URL(location.href).searchParams.get('v') || '1.5.2.8';
+    const swUrl = `service-worker.js?v=${version}`;
+    navigator.serviceWorker.register(swUrl)
+        .then(reg => {
+            console.log('SW registriert mit Version:', version);
+            registerUpdateListener();
+        })
+        .catch(err => console.error('SW-Registrierung fehlgeschlagen:', err));
 }
 // === CSV IMPORT – 100% SICHER & MIT DEBUG ===
 function importCSV(event) {
@@ -2949,9 +3091,7 @@ function escapeHtml(text) {
  </script>  <!-- ← ENDE SCRIPT -->
 
      <!-- Version-Info -->
-    <div class="version-info">
-        v1.5.2.5 – © Matthias Kloß MPZ NB
-    </div>
+    <div class="version-info" id="versionInfo">Lade Version...</div>
 
     <!-- === LÖSCH-ANIMATION === -->
     <div id="deleteAnimation" style="
@@ -3150,63 +3290,86 @@ tr:last-child td {
     }
 }
 @media print {
-    body {
-        background: white !important;
-        color: black !important;
-        font-size: 10pt !important;
+    /* Alles verstecken außer .main */
+    body * {
+        visibility: hidden !important;
+    }
+    .main, .main * {
+        visibility: visible !important;
+    }
+    .main {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        padding: 12mm 10mm !important;
         margin: 0 !important;
     }
 
-    /* Verstecke unnötige Elemente */
-    .logo-header, .filter-container, .export-buttons, .new-resource-btn, 
-    .sidebar, .version-info, #deleteAnimation, #editAnimation, #addAnimation,
-    .action-icons, .test-banner, div[style*="background: #ff4444"] {  /* Banner verstecken */
+    /* TESTVERSION-BANNER & andere Störer verstecken */
+    .test-banner,
+    [class*="test"],
+    [style*="TESTVERSION"],
+    [style*="nicht live"],
+    .version-info,
+    .logo-header,
+    .filter-container,
+    .export-buttons,
+    .sidebar,
+    .new-resource-btn,
+    #deleteAnimation,
+    #editAnimation,
+    #addAnimation {
         display: none !important;
     }
 
-    /* Ressourcen-Container optimieren */
-    .content-wrapper { display: block !important; }
-    .resources-container { width: 100% !important; margin: 0 !important; padding: 0 !important; }
-    .resource-item { border: 1px solid #ddd !important; page-break-inside: avoid !important; margin-bottom: 10mm !important; }
-    .tag { background: #eee !important; color: black !important; }
-    .description { background: none !important; border-left: 3px solid #000 !important; }
-
-    /* Schulname sichtbar machen – mit Fallback */
-    #printSchoolName {
-        display: block !important;
-        position: running(schoolFooter) !important;  /* Für Browser, die es unterstützen (z. B. Firefox) */
-        font-size: 9pt !important;
-        color: #666 !important;
+    /* Kein unnötiger Platz */
+    * {
+        float: none !important;
+        position: static !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
 
-    /* @page Regeln */
+    /* Ressourcen: mehr pro Seite */
+    .print-resource {
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+        margin-bottom: 5mm !important;
+    }
+
+    /* Beschreibung: passt sich an */
+    .print-resource > div[style*="background"] {
+        display: inline-block !important;
+        width: auto !important;
+        margin: 2mm 0 0 !important;
+        padding: 2mm 6mm !important;
+    }
+
+    /* Seitenlayout */
     @page {
         size: A4 portrait;
-        margin: 20mm 15mm 25mm 15mm;  /* Mehr Platz unten für Footer */
-        @top-center {
-            content: "LernDashboard Digital - Seite " counter(page) " / " counter(pages);
-            font-size: 9pt;
-            color: #666;
-        }
+        margin: 12mm 10mm 18mm 10mm;
         @bottom-left {
-            content: element(schoolFooter);  /* Verknüpft mit running(schoolFooter) */
-            font-size: 9pt;
+            content: "Seite " counter(page);
+            font-size: 8pt;
             color: #666;
         }
         @bottom-right {
-            content: "Exportiert am: " env(date);
-            font-size: 9pt;
+            content: "LernDashboard Digital";
+            font-size: 8pt;
             color: #666;
         }
     }
 
-    /* Fallback für Browser ohne running-Support (z. B. Chrome): Fixed-Position */
-    @supports not (position: running(schoolFooter)) {
-        #printSchoolName {
-            position: fixed !important;
-            bottom: 10mm !important;
-            left: 15mm !important;
-        }
+    /* Schulname unten */
+    #printSchoolName {
+        display: block !important;
+        position: fixed !important;
+        bottom: 8mm !important;
+        left: 10mm !important;
+        font-size: 8pt !important;
+        color: #666 !important;
     }
 }
 /* === ZENTRIERTER BUTTON-WRAPPER === */
