@@ -1,11 +1,9 @@
 // service-worker.js
-const url = new URL(self.location.href);
-const VERSION = url.searchParams.get('v') || '1.0.0';
-const CACHE_NAME = `lerndashboard-v${VERSION.replace(/\./g, '')}`;
+const CACHE_NAME = 'lerndashboard-v1';
 
 const urlsToCache = [
-  '/',
-  '/index.html',
+  '/',                     // WICHTIG: Root-Pfad!
+  '/index.html',           // Fallback
   '/new-resource.html',
   '/edit-resource.html',
   '/manifest.json',
@@ -15,6 +13,7 @@ const urlsToCache = [
   '/icon-maskable-512.png'
 ];
 
+// INSTALL
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -23,23 +22,25 @@ self.addEventListener('install', event => {
   );
 });
 
+// AKTIVIEREN – alten Cache löschen
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => Promise.all(
-      keys.map(key => key !== CACHE_NAME ? caches.delete(key) : null)
+      keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
     )).then(() => self.clients.claim())
   );
 });
 
+// FETCH – Navigation → immer index.html
 self.addEventListener('fetch', event => {
-  if (event.request.mode === 'navigate') {
+  const req = event.request;
+  if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match('/'))
+      fetch(req).catch(() => caches.match('/'))
     );
   } else {
     event.respondWith(
-      caches.match(event.request)
-        .then(response => response || fetch(event.request))
+      caches.match(req).then(resp => resp || fetch(req))
     );
   }
 });
