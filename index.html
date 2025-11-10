@@ -10,6 +10,56 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <link rel="prefetch" href="edit-resource.html">
     <link rel="prefetch" href="new-resource.html">
+
+    <!-- DYNAMISCHER JSPDF-LOADER -->
+<script>
+    window.jspdfLoaded = false;
+
+    const jspdfScript = document.createElement('script');
+    jspdfScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+
+    jspdfScript.onload = () => {
+        const autotableScript = document.createElement('script');
+        autotableScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
+
+        autotableScript.onload = () => {
+            window.jspdfLoaded = true;
+            console.log('jsPDF + autoTable erfolgreich geladen');
+
+            // BUTTON AKTIVIEREN
+            const matrixBtn = document.getElementById('matrixPdfBtn');
+            if (matrixBtn) {
+                matrixBtn.disabled = false;
+                matrixBtn.textContent = 'Matrix PDF';
+                matrixBtn.onclick = exportMatrixPDF; // Jetzt sicher zuweisen
+            }
+        };
+
+        autotableScript.onerror = () => {
+            console.error('Fehler beim Laden von jsPDF autoTable');
+            alert('Fehler: PDF-Export (Matrix) konnte nicht geladen werden.');
+        };
+
+        document.head.appendChild(autotableScript);
+    };
+
+    jspdfScript.onerror = () => {
+        console.error('Fehler beim Laden von jsPDF');
+        alert('Fehler: PDF-Bibliothek konnte nicht geladen werden.');
+    };
+
+    document.head.appendChild(jspdfScript);
+
+    // Optional: Ladehinweis im Button anzeigen
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('matrixPdfBtn');
+        if (btn) {
+            btn.textContent = 'Lade PDF...';
+        }
+    });
+</script>
+
+    <!-- jsPDF + Autotable (für Tabellen in PDF) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
@@ -753,9 +803,8 @@
                     <button class="btn matrix filtered-export" onclick="exportMatrixCSV()" 
                             style="background:#e67e22;" 
                             title="Matrix als CSV – basierend auf aktuellen Filtern">Matrix CSV</button>
-                    <button class="btn matrix filtered-export" onclick="exportMatrixPDF()" 
-                            style="background:#9c27b0; color:white;" 
-                            title="Matrix als PDF – nur gefilterte Daten">Matrix PDF</button>
+                    <button class="btn matrix filtered-export" id="matrixPdfBtn"style="background:#9c27b0; color:white;"title="Matrix als PDF – nur gefilterte Daten"
+                            disabled>Matrix PDF</button>
                     <button class="btn matrix filtered-export" onclick="exportMatrixExcel()" 
                             style="background:#27ae60; color:white; border:2px solid #1e7e34;" 
                             title="Formatierte Excel-Matrix mit aktuellen Filtern">Matrix Excel</button>
@@ -1591,35 +1640,54 @@ function exportMatrixCSV() {
     link.download = `LernDashboard_Matrix_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
 }
-function exportMatrixPDF() {
-    const { jsPDF } = window.jspdf;
+// ──────────────────────────────────────────────────────────────
+//  MATRIX → PDF (funktioniert jetzt garantiert)
+// ──────────────────────────────────────────────────────────────
+async function exportMatrixPDF() {
+    // 1. Gefilterte Daten holen
     const filtered = getFilteredResources();
     if (filtered.length === 0) {
-        showAlert("Keine passenden Ressourcen für die Matrix!\nTipp: Filter zurücksetzen oder Daten prüfen.");
+        showAlert('Keine Daten für Matrix verfügbar!');
         return;
     }
 
-    const doc = new jsPDF('l', 'mm', 'a4');
-    const pageWidth = doc.internal.pageSize.getWidth();
+    // 2. Warten, bis jsPDF + autoTable geladen sind
+    if (!window.jspdfLoaded) {
+        showFancyAlert('jsPDF wird geladen...', 'info');
+        await new Promise(resolve => {
+            const check = setInterval(() => {
+                if (window.jspdfLoaded) {
+                    clearInterval(check);
+                    resolve();
+                }
+            }, 50);
+        });
+    }
+
+    // 3. jsPDF initialisieren
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('l', 'mm', 'a4');               // landscape
+    const pageWidth  = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
 
-    // === LAYOUT ===
-    const leftMargin = 12;
-    const rightMargin = 12;
-    const topMargin = 18;
-    const usableWidth = pageWidth - leftMargin - rightMargin;
+    // ── Layout-Konstanten ─────────────────────────────────────
+    const leftMargin   = 12;
+    const rightMargin  = 12;
+    const topMargin    = 18;
+    const usableWidth  = pageWidth - leftMargin - rightMargin;
     const compColWidth = usableWidth * 0.22;
     const levelColWidth = (usableWidth - compColWidth) / 5;
     let currentY = topMargin;
 
-    // === TITEL ===
+    // ── Titel (dynamisch) ─────────────────────────────────────
     const subjectFilter = document.getElementById('filterSubject')?.value?.trim() || '';
-    const gradeFilter = document.getElementById('filterGrade')?.value?.trim() || '';
-    const toolFilter = document.getElementById('filterTool')?.value?.trim().toLowerCase() || '';
+    const gradeFilter   = document.getElementById('filterGrade')?.value?.trim()   || '';
+    const toolFilter    = document.getElementById('filterTool')?.value?.trim().toLowerCase() || '';
+
     const subjectText = subjectFilter ? subjectFilter : 'Alle Fächer';
-    let gradeText = gradeFilter ? gradeFilter : 'Alle Klassen';
-    const toolText = toolFilter ? ` | Tool: ${toolFilter}` : '';
-    const title = `${subjectText} | ${gradeText}${toolText}`;
+    const gradeText   = gradeFilter   ? gradeFilter   : 'Alle Klassen';
+    const toolText    = toolFilter    ? ` | Tool: ${toolFilter}` : '';
+    const title       = `${subjectText} | ${gradeText}${toolText}`;
 
     doc.setFontSize(16);
     doc.setTextColor(107, 70, 193);
@@ -1627,17 +1695,17 @@ function exportMatrixPDF() {
     doc.text(title, pageWidth / 2, currentY, { align: 'center' });
     currentY += 7;
 
-    // === KOPFZEILE: Schulname links, Datum rechts ===
+    // ── Schulname & Datum ─────────────────────────────────────
     doc.setFontSize(10);
     doc.setTextColor(100);
     doc.setFont('helvetica', 'italic');
     const schoolName = localStorage.getItem('schoolName') || 'Deine Schule';
     doc.text(schoolName, leftMargin, currentY - 8);
-    const exportDate = `Export: ${new Date().toLocaleDateString('de-DE')}`;
-    doc.text(exportDate, pageWidth - rightMargin, currentY - 8, { align: 'right' });
-    currentY += 5; // Abstand zur Tabelle
+    doc.text(`Export: ${new Date().toLocaleDateString('de-DE')}`,
+             pageWidth - rightMargin, currentY - 8, { align: 'right' });
+    currentY += 5;
 
-    // === DATEN ===
+    // ── Daten aufbauen ───────────────────────────────────────
     const competences = [
         "Suchen, Verarbeiten und Aufbewahren",
         "Kommunizieren und Kooperieren",
@@ -1646,9 +1714,9 @@ function exportMatrixPDF() {
         "Problemlösen und Handeln",
         "Analysieren und Reflektieren"
     ];
-    const levels = ["Niveaustufe 1", "Niveaustufe 2", "Niveaustufe 3", "Niveaustufe 4", "Niveaustufe 5"];
+    const levels = ["Niveaustufe 1","Niveaustufe 2","Niveaustufe 3","Niveaustufe 4","Niveaustufe 5"];
     const levelColors = [
-        [139, 195, 74], [76, 175, 80], [255, 193, 7], [255, 152, 0], [244, 67, 54]
+        [139,195,74],[76,175,80],[255,193,7],[255,152,0],[244,67,54]
     ];
 
     const matrix = {};
@@ -1657,109 +1725,102 @@ function exportMatrixPDF() {
         levels.forEach(l => matrix[c][l] = []);
     });
 
-    // === DATEN FÜLLEN ===
     resources.forEach(r => {
-        const subject = r.subject?.trim();
-        const grade = r.grade?.trim();
-        const tool = r.tool?.trim().toLowerCase();
-        const comp = r.competence?.trim();
-        const level = r.level?.trim();
+        const s = r.subject?.trim();
+        const g = r.grade?.trim();
+        const t = r.tool?.trim().toLowerCase();
+        const c = r.competence?.trim();
+        const l = r.level?.trim();
         const topic = r.topic?.trim();
-        if (!comp || !level || !topic) return;
+        if (!c || !l || !topic) return;
 
-        const matchesSubject = !subjectFilter || subject === subjectFilter;
-        const matchesGrade = !gradeFilter || grade === gradeFilter;
-        const matchesTool = !toolFilter || tool === toolFilter;
-
-        if (matchesSubject && matchesGrade && matchesTool) {
-            matrix[comp][level].push(`${topic}\nKlasse ${grade}${r.tool ? ` – ${r.tool}` : ''}`);
+        const match = (!subjectFilter || s === subjectFilter) &&
+                      (!gradeFilter   || g === gradeFilter)   &&
+                      (!toolFilter    || t === toolFilter);
+        if (match) {
+            matrix[c][l].push(`${topic}\nKlasse ${g}${r.tool ? ` – ${r.tool}` : ''}`);
         }
     });
 
-    // === HELFER ===
-    const drawLine = (x1, y1, x2, y2) => {
+    // ── Hilfsfunktionen ───────────────────────────────────────
+    const drawLine = (x1,y1,x2,y2) => {
         doc.setDrawColor(180);
         doc.setLineWidth(0.25);
-        doc.line(x1, y1, x2, y2);
+        doc.line(x1,y1,x2,y2);
     };
 
-    const drawHeader = (y) => {
+    const drawHeader = y => {
         const h = 11;
         let x = leftMargin;
 
-        doc.setFillColor(107, 70, 193);
+        // Kompetenz-Spalte
+        doc.setFillColor(107,70,193);
         doc.rect(x, y, compColWidth, h, 'F');
         doc.setTextColor(255);
         doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Kompetenz', x + 4, y + 7.5);
+        doc.setFont('helvetica','bold');
+        doc.text('Kompetenz', x+4, y+7.5);
         x += compColWidth;
 
-        levels.forEach((lvl, i) => {
+        // Level-Spalten
+        levels.forEach((lvl,i) => {
             doc.setFillColor(...levelColors[i]);
             doc.rect(x, y, levelColWidth, h, 'F');
             doc.setTextColor(255);
-            const lines = doc.splitTextToSize(lvl, levelColWidth - 8);
-            const lineHeight = 3.8;
-            const startY = y + (h - lines.length * lineHeight) / 2 + lineHeight;
-            doc.text(lines, x + levelColWidth / 2, startY, { align: 'center' });
+            const lines = doc.splitTextToSize(lvl, levelColWidth-8);
+            const lineH = 3.8;
+            const startY = y + (h - lines.length*lineH)/2 + lineH;
+            doc.text(lines, x + levelColWidth/2, startY, {align:'center'});
             x += levelColWidth;
         });
 
         doc.setDrawColor(120);
         doc.setLineWidth(0.5);
-        doc.line(leftMargin, y + h, pageWidth - rightMargin, y + h);
+        doc.line(leftMargin, y+h, pageWidth-rightMargin, y+h);
         return y + h;
     };
 
-    // === HELFER: Zentrierter Text ===
-    const drawCenteredText = (textLines, x, y, width, height, lineHeight, isBold = false) => {
-        const totalTextHeight = textLines.length * lineHeight;
-        const startY = y + (height - totalTextHeight) / 2 + lineHeight * 0.7;
-        doc.setFont('helvetica', isBold ? 'bold' : 'normal');
-        doc.text(textLines, x, startY);
+    const drawCenteredText = (lines, x, y, w, h, lineH, bold=false) => {
+        const totalH = lines.length * lineH;
+        const startY = y + (h - totalH)/2 + lineH*0.7;
+        doc.setFont('helvetica', bold?'bold':'normal');
+        doc.text(lines, x+4, startY);
     };
 
-    // === HEADER ===
+    // ── Header zeichnen ───────────────────────────────────────
     let headerBottom = drawHeader(currentY);
     currentY = headerBottom;
 
-    // === ZEILEN ===
-    const COMP_FONT_SIZE = 9.5;
-    const LEVEL_FONT_SIZE = 8.0;
-    const LINE_HEIGHT_FACTOR = 1.2;
-    const MIN_ROW_HEIGHT = 16;  // Erhöht
-    const LINE_HEIGHT_COMP = COMP_FONT_SIZE * LINE_HEIGHT_FACTOR * 0.3528;
-    const LINE_HEIGHT_LEVEL = LEVEL_FONT_SIZE * LINE_HEIGHT_FACTOR * 0.3528;
+    // ── Zeilen zeichnen ───────────────────────────────────────
+    const COMP_FS = 9.5, LEVEL_FS = 8.0;
+    const LH_COMP = COMP_FS * 1.2 * 0.3528;
+    const LH_LEVEL = LEVEL_FS * 1.2 * 0.3528;
+    const MIN_ROW_H = 16;
 
-    competences.forEach((comp) => {
-        // 1. Kompetenz-Text
-        const compLines = doc.splitTextToSize(comp, compColWidth - 8);
-        const compTextHeight = compLines.length * LINE_HEIGHT_COMP;
+    competences.forEach(comp => {
+        // max. Text-Höhe ermitteln
+        const compLines = doc.splitTextToSize(comp, compColWidth-8);
+        const compH = compLines.length * LH_COMP;
 
-        // 2. Level-Texte: Exakte Höhe
-        let maxLevelTextHeight = 0;
+        let maxLevelH = 0;
         levels.forEach(l => {
-            const entries = matrix[comp][l];
-            const rawText = entries.length > 0 ? entries.join('\n\n') : '—';
-            const lines = doc.splitTextToSize(rawText, levelColWidth - 8);
-            const height = lines.length * LINE_HEIGHT_LEVEL;
-            if (height > maxLevelTextHeight) maxLevelTextHeight = height;
+            const raw = matrix[comp][l].length ? matrix[comp][l].join('\n\n') : '—';
+            const lines = doc.splitTextToSize(raw, levelColWidth-8);
+            const h = lines.length * LH_LEVEL;
+            if (h > maxLevelH) maxLevelH = h;
         });
 
-        // 3. Zeilenhöhe
-        const maxTextHeight = Math.max(compTextHeight, maxLevelTextHeight);
-        const rowHeight = Math.max(MIN_ROW_HEIGHT, maxTextHeight + 8);  // +8 Puffer
+        const rowH = Math.max(MIN_ROW_H, Math.max(compH, maxLevelH) + 8);
 
-        // === SEITENUMBRUCH ===
-        if (currentY + rowHeight > pageHeight - 20) {
-            drawLine(leftMargin, headerBottom - 3, leftMargin, currentY);
-            drawLine(pageWidth - rightMargin, headerBottom - 3, pageWidth - rightMargin, currentY);
+        // Seitenumbruch?
+        if (currentY + rowH > pageHeight - 20) {
+            drawLine(leftMargin, headerBottom-3, leftMargin, currentY);
+            drawLine(pageWidth-rightMargin, headerBottom-3, pageWidth-rightMargin, currentY);
             doc.addPage();
             currentY = topMargin;
             doc.setFontSize(10);
             doc.setTextColor(100);
-            doc.text(`Fortsetzung – Seite ${doc.getCurrentPageInfo().pageNumber}`, pageWidth - rightMargin, currentY, { align: 'right' });
+            doc.text(`Fortsetzung – Seite ${doc.getCurrentPageInfo().pageNumber}`, pageWidth - rightMargin, currentY, {align:'right'});
             currentY += 8;
             headerBottom = drawHeader(currentY);
             currentY = headerBottom;
@@ -1768,142 +1829,46 @@ function exportMatrixPDF() {
         const rowY = currentY;
         let x = leftMargin;
 
-        // === KOMPETENZ ZELLE ===
-        doc.setFillColor(248, 249, 255);
-        doc.rect(x, rowY, compColWidth, rowHeight, 'F');
+        // Kompetenz-Zelle
+        doc.setFillColor(248,249,255);
+        doc.rect(x, rowY, compColWidth, rowH, 'F');
         doc.setTextColor(0);
-        doc.setFontSize(COMP_FONT_SIZE);
-        drawCenteredText(compLines, x + 4, rowY, compColWidth, rowHeight, LINE_HEIGHT_COMP, true);
-        drawLine(x + compColWidth, rowY, x + compColWidth, rowY + rowHeight);
+        doc.setFontSize(COMP_FS);
+        drawCenteredText(compLines, x, rowY, compColWidth, rowH, LH_COMP, true);
+        drawLine(x+compColWidth, rowY, x+compColWidth, rowY+rowH);
         x += compColWidth;
 
-        // === LEVEL ZELLEN ===
+        // Level-Zellen
         levels.forEach((lvl, j) => {
-            const entries = matrix[comp][lvl];
-            const rawText = entries.length > 0 ? entries.join('\n\n') : '—';
-            const lines = doc.splitTextToSize(rawText, levelColWidth - 8);
-
-            doc.setFillColor(255, 255, 255);
-            doc.rect(x, rowY, levelColWidth, rowHeight, 'F');
+            const raw = matrix[comp][lvl].length ? matrix[comp][lvl].join('\n\n') : '—';
+            const lines = doc.splitTextToSize(raw, levelColWidth-8);
+            doc.setFillColor(255,255,255);
+            doc.rect(x, rowY, levelColWidth, rowH, 'F');
             doc.setTextColor(60);
-            doc.setFontSize(LEVEL_FONT_SIZE);
-            drawCenteredText(lines, x + 4, rowY, levelColWidth, rowHeight, LINE_HEIGHT_LEVEL, false);
-
-            if (j < 4) drawLine(x + levelColWidth, rowY, x + levelColWidth, rowY + rowHeight);
+            doc.setFontSize(LEVEL_FS);
+            drawCenteredText(lines, x, rowY, levelColWidth, rowH, LH_LEVEL);
+            if (j < 4) drawLine(x+levelColWidth, rowY, x+levelColWidth, rowY+rowH);
             x += levelColWidth;
         });
 
-        drawLine(leftMargin, rowY + rowHeight, pageWidth - rightMargin, rowY + rowHeight);
-        currentY += rowHeight;
+        drawLine(leftMargin, rowY+rowH, pageWidth-rightMargin, rowY+rowH);
+        currentY += rowH;
     });
 
-    // === LETZTE LINIEN ===
-    drawLine(leftMargin, headerBottom - 3, leftMargin, currentY);
-    drawLine(pageWidth - rightMargin, headerBottom - 3, pageWidth - rightMargin, currentY);
+    // ── Abschlusslinien & Seitenzahlen ───────────────────────
+    drawLine(leftMargin, headerBottom-3, leftMargin, currentY);
+    drawLine(pageWidth-rightMargin, headerBottom-3, pageWidth-rightMargin, currentY);
 
-    // === SEITENZAHL ===
     const totalPages = doc.getNumberOfPages();
-    for (let i = 1; i <= totalPages; i++) {
+    for (let i=1; i<=totalPages; i++) {
         doc.setPage(i);
         doc.setFontSize(9);
         doc.setTextColor(150);
-        doc.text(`Seite ${i}`, pageWidth - rightMargin, pageHeight - 8, { align: 'right' });
+        doc.text(`Seite ${i}`, pageWidth-rightMargin, pageHeight-8, {align:'right'});
     }
 
-    doc.save(`LernDashboard_Matrix_${new Date().toISOString().slice(0, 10)}.pdf`);
-}
-function exportMatrixExcel() {
-    const filtered = getFilteredResources();
-    if (filtered.length === 0) {
-        showFancyAlert('Keine Daten für die Matrix!', 'warning');
-        return;
-    }
-
-    const competences = [
-        "Suchen, Verarbeiten und Aufbewahren",
-        "Kommunizieren und Kooperieren",
-        "Produzieren und Präsentieren",
-        "Schützen und sicher Agieren",
-        "Problemlösen und Handeln",
-        "Analysieren und Reflektieren"
-    ];
-
-    const levels = ["Niveaustufe 1", "Niveaustufe 2", "Niveaustufe 3", "Niveaustufe 4", "Niveaustufe 5"];
-
-    // === Matrix aufbauen ===
-    const matrix = {};
-    competences.forEach(c => matrix[c] = {});
-    levels.forEach(l => competences.forEach(c => matrix[c][l] = []));
-
-    filtered.forEach(r => {
-        if (r.competence && r.level && matrix[r.competence][r.level]) {
-            const entry = `${r.topic} (${[r.subject, r.grade, r.tool].filter(Boolean).join(', ')})`;
-            const desc = r.description ? `: ${r.description}` : '';
-            matrix[r.competence][r.level].push(entry + desc);
-        }
-    });
-
-    // === ExcelJS Workbook ===
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Kompetenzmatrix');
-
-    // === Header ===
-    const headerRow = sheet.addRow(['Kompetenzbereich', ...levels]);
-    headerRow.eachCell((cell, colNumber) => {
-        cell.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: colNumber === 1 ? 'FF6B46C1' : 'FF00BFFF' }
-        };
-        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
-        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-    });
-
-    // === Zeilen ===
-    competences.forEach(comp => {
-        const rowValues = [comp, ...levels.map(l => matrix[comp][l].join('\n\n') || '–')];
-        const row = sheet.addRow(rowValues);
-
-        // Kompetenz-Spalte
-        const compCell = row.getCell(1);
-        compCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF8C00' } };
-        compCell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-        compCell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-
-        // Inhaltszellen
-        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-            if (colNumber > 1) {
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8F9FA' } };
-                cell.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
-            }
-        });
-
-        // === Dynamische Zeilenhöhe (FEHLER BEHOBEN) ===
-        let maxLines = 1;
-        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-            if (colNumber > 1 && cell.value) {
-                const text = cell.value.toString();
-                const lines = (text.match(/\n/g) || []).length + 1;
-                if (lines > maxLines) maxLines = lines;
-            }
-        });
-        row.height = Math.max(60, maxLines * 20);
-    });
-
-    // === Spaltenbreiten ===
-    sheet.columns = [
-        { width: 36 },
-        { width: 44 }, { width: 44 }, { width: 44 }, { width: 44 }, { width: 44 }
-    ];
-
-    // === Export ===
-    workbook.xlsx.writeBuffer().then(buffer => {
-        const blob = new Blob([buffer], { type: 'application/octet-stream' });
-        saveAs(blob, `Kompetenzmatrix_${new Date().toISOString().slice(0,10)}.xlsx`);
-    }).catch(err => {
-        console.error("Export-Fehler:", err);
-        showFancyAlert('Export fehlgeschlagen!', 'error');
-    });
+    // ── Download ─────────────────────────────────────────────
+    doc.save(`LernDashboard_Matrix_${new Date().toISOString().slice(0,10)}.pdf`);
 }
 // === Hilfsfunktion: Base64 → Blob ===
 function base64ToBlob(b64Data, contentType = '', sliceSize = 512) {
