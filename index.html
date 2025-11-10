@@ -1641,7 +1641,7 @@ function exportMatrixCSV() {
     link.click();
 }
 // ──────────────────────────────────────────────────────────────
-//  MATRIX → PDF (funktioniert jetzt garantiert)
+//  MATRIX → PDF 
 // ──────────────────────────────────────────────────────────────
 async function exportMatrixPDF() {
     // 1. Gefilterte Daten holen
@@ -1869,6 +1869,114 @@ async function exportMatrixPDF() {
 
     // ── Download ─────────────────────────────────────────────
     doc.save(`LernDashboard_Matrix_${new Date().toISOString().slice(0,10)}.pdf`);
+}
+function exportMatrixExcel() {
+    const filtered = getFilteredResources();
+    if (filtered.length === 0) {
+        showFancyAlert('Keine Daten für die Matrix!', 'warning');
+        return;
+    }
+
+    const competences = [
+        "Suchen, Verarbeiten und Aufbewahren",
+        "Kommunizieren und Kooperieren",
+        "Produzieren und Präsentieren",
+        "Schützen und sicher Agieren",
+        "Problemlösen und Handeln",
+        "Analysieren und Reflektieren"
+    ];
+
+    const levels = ["Niveaustufe 1", "Niveaustufe 2", "Niveaustufe 3", "Niveaustufe 4", "Niveaustufe 5"];
+
+    // === Matrix aufbauen ===
+    const matrix = {};
+    competences.forEach(c => matrix[c] = {});
+    levels.forEach(l => competences.forEach(c => matrix[c][l] = []));
+
+    filtered.forEach(r => {
+        if (r.competence && r.level && matrix[r.competence][r.level]) {
+            const entry = `${r.topic} (${[r.subject, r.grade, r.tool].filter(Boolean).join(', ')})`;
+            const desc = r.description ? `: ${r.description}` : '';
+            matrix[r.competence][r.level].push(entry + desc);
+        }
+    });
+
+    // === ExcelJS Workbook ===
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Kompetenzmatrix');
+
+    // === Header ===
+    const headerRow = sheet.addRow(['Kompetenzbereich', ...levels]);
+    headerRow.eachCell((cell, colNumber) => {
+        cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: colNumber === 1 ? 'FF6B46C1' : 'FF00BFFF' }
+        };
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    });
+
+    // === Zeilen ===
+    competences.forEach(comp => {
+        const rowValues = [comp, ...levels.map(l => matrix[comp][l].join('\n\n') || '–')];
+        const row = sheet.addRow(rowValues);
+
+        // Kompetenz-Spalte
+        const compCell = row.getCell(1);
+        compCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFF8C00' } };
+        compCell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        compCell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+
+        // Inhaltszellen
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            if (colNumber > 1) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8F9FA' } };
+                cell.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
+            }
+        });
+
+        // === Dynamische Zeilenhöhe (FEHLER BEHOBEN) ===
+        let maxLines = 1;
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            if (colNumber > 1 && cell.value) {
+                const text = cell.value.toString();
+                const lines = (text.match(/\n/g) || []).length + 1;
+                if (lines > maxLines) maxLines = lines;
+            }
+        });
+        row.height = Math.max(60, maxLines * 20);
+    });
+
+    // === Spaltenbreiten ===
+    sheet.columns = [
+        { width: 36 },
+        { width: 44 }, { width: 44 }, { width: 44 }, { width: 44 }, { width: 44 }
+    ];
+
+    // === Export ===
+    workbook.xlsx.writeBuffer().then(buffer => {
+        const blob = new Blob([buffer], { type: 'application/octet-stream' });
+        saveAs(blob, `Kompetenzmatrix_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }).catch(err => {
+        console.error("Export-Fehler:", err);
+        showFancyAlert('Export fehlgeschlagen!', 'error');
+    });
+}
+// === Hilfsfunktion: Base64 → Blob ===
+function base64ToBlob(b64Data, contentType = '', sliceSize = 512) {
+    const byteCharacters = atob(b64Data);
+    const byteArrays = [];
+    for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+        const slice = byteCharacters.slice(offset, offset + sliceSize);
+        const byteNumbers = new Array(slice.length);
+        for (let i = 0; i < slice.length; i++) {
+            byteNumbers[i] = slice.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        byteArrays.push(byteArray);
+    }
+    return new Blob(byteArrays, { type: contentType });
 }
 // === Hilfsfunktion: Base64 → Blob ===
 function base64ToBlob(b64Data, contentType = '', sliceSize = 512) {
