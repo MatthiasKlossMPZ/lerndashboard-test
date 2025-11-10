@@ -2,7 +2,7 @@
   "name": "LernDashboard Digital",
   "short_name": "LernDB",
   "description": "Digitale Unterrichtsideen & Ressourcen verwalten",
-  "start_url": "https://matthiasklossmpz.github.io/lerndashboard-test/",  // ← Pfad zum Ordner!
+  "start_url": "https://matthiasklossmpz.github.io/lerndashboard-test/",
   "display": "standalone",
   "background_color": "#6b46c1",
   "theme_color": "#6b46c1",
@@ -32,14 +32,5 @@
       "type": "image/png",
       "purpose": "maskable"
     }
-  ]
-}
-{
-  "start_url": "/lerndashboard-test/",
-  "icons": [
-    { "src": "/lerndashboard-test/icon-192.png", ... },
-    { "src": "/lerndashboard-test/icon-512.png", ... },
-    { "src": "/lerndashboard-test/icon-maskable-192.png", ... },
-    { "src": "/lerndashboard-test/icon-maskable-512.png", ... }
   ]
 }
