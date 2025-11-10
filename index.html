@@ -2529,13 +2529,17 @@ if (!document.getElementById('app-animations')) {
 
 // === SERVICE WORKER REGISTRIERUNG MIT VERSION (dynamisch) ===
 if ('serviceWorker' in navigator) {
-  const swUrl = `service-worker.js?v=${CURRENT_VERSION}`;
+  const REPO_PATH = '/lerndashboard-test';  // ← Dein GitHub Pages Pfad
+  const swUrl = `${REPO_PATH}/service-worker.js?v=${CURRENT_VERSION}`;
+
   navigator.serviceWorker.register(swUrl)
     .then(reg => {
-      console.log('SW registriert mit Version:', CURRENT_VERSION);
-      registerUpdateListener(); // ← Deine bestehende, korrekte Logik!
+      console.log('SW registriert mit Version:', CURRENT_VERSION, reg);
+      registerUpdateListener(); // ← Deine bestehende Logik bleibt!
     })
-    .catch(err => console.error('SW-Registrierung fehlgeschlagen:', err));
+    .catch(err => {
+      console.error('SW-Registrierung fehlgeschlagen:', err);
+    });
 }
 // === CSV IMPORT – 100% SICHER & MIT DEBUG ===
 function importCSV(event) {
