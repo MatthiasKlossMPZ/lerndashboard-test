@@ -1097,7 +1097,7 @@ function registerUpdateListener() {
 
 // === 3. DOMContentLoaded (jetzt sicher!) ===
 document.addEventListener('DOMContentLoaded', () => {
-    const version = new URL(location.href).searchParams.get('v') || '1.5.2.9';
+    const version = new URL(location.href).searchParams.get('v') || '1.5.3.0';
     const versionEl = document.getElementById('versionInfo');
     if (versionEl) versionEl.textContent = `v${version} – © Matthias Kloß MPZ NB`;
 
@@ -1122,7 +1122,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // === 5. SERVICE WORKER ===
 if ('serviceWorker' in navigator) {
-    const version = new URL(location.href).searchParams.get('v') || '1.5.2.9';
+    const version = new URL(location.href).searchParams.get('v') || '1.5.3.0';
     const swUrl = `service-worker.js?v=${version}`;
     navigator.serviceWorker.register(swUrl)
         .then(reg => {
@@ -2453,7 +2453,6 @@ function printOptimized() {
 
 // === UPDATE BANNER – KLICKBAR & 10 SEKUNDEN ===
 function showUpdateBanner(version) {
-    // Verhindere doppeltes Banner
     if (document.getElementById('updateBanner')) return;
 
     const banner = document.createElement('div');
@@ -2477,6 +2476,7 @@ function showUpdateBanner(version) {
         animation: slideIn 0.5s ease;
         pointer-events: auto !important;
     `;
+
     banner.innerHTML = `
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
@@ -2497,24 +2497,26 @@ function showUpdateBanner(version) {
 
     document.body.appendChild(banner);
 
-    // --- NUR HIER: skipWaiting + Reload ---
-banner.querySelector('#installUpdateBtn').onclick = () => {
-    banner.style.opacity = '0';
-    banner.style.transition = 'opacity 0.3s ease';
-    if (newServiceWorker) {
-        newServiceWorker.postMessage({ action: 'skipWaiting' });
-    }
-    setTimeout(() => window.location.reload(), 500);
-};
+    // UPDATE JETZT
+    banner.querySelector('#updateNowBtn').onclick = () => {
+        banner.style.opacity = '0';
+        banner.style.transition = 'opacity 0.3s ease';
+        
+        if (newServiceWorker) {
+            newServiceWorker.postMessage({ action: 'skipWaiting' });
+        }
+        
+        setTimeout(() => window.location.reload(), 500);
+    };
 
-    // Schließen
+    // SCHLIESSEN
     banner.querySelector('#closeBtn').onclick = () => {
         banner.style.opacity = '0';
         banner.style.transition = 'opacity 0.3s ease';
         setTimeout(() => banner.remove(), 300);
     };
 
-    // 15 Sekunden Timeout (extra lang für dich!)
+    // Auto-Schließen nach 15 Sekunden
     setTimeout(() => {
         const b = document.getElementById('updateBanner');
         if (b) {
@@ -2522,7 +2524,7 @@ banner.querySelector('#installUpdateBtn').onclick = () => {
             b.style.transition = 'opacity 0.5s ease';
             setTimeout(() => b.remove(), 500);
         }
-    }, 15000);  // 15 Sekunden!
+    }, 15000);
 }
         
 // === UPDATE-BANNER MIT "JETZT INSTALLIEREN" ===
@@ -2570,35 +2572,6 @@ banner.querySelector('#updateNowBtn').onclick = () => {
     }, 500);
 };
 }
-        
-// Service Worker Update-Handling
-function registerUpdateListener() {
-  if ('serviceWorker' in navigator) {
-    // 1. Registrierung mit Cache-Busting
-    const swUrl = `service-worker.js?t=${Date.now()}`;
-    navigator.serviceWorker.register(swUrl)
-      .then(registration => {
-        console.log('SW registriert:', registration.scope);
-
-        // 2. Update sofort prüfen
-        registration.update();
-
-        // 3. Update-Events
-        registration.addEventListener('updatefound', () => {
-          newServiceWorker = registration.installing;
-          if (newServiceWorker) {
-            newServiceWorker.addEventListener('statechange', () => {
-              if (newServiceWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                const pendingVersion = localStorage.getItem(PENDING_UPDATE_KEY);
-                if (pendingVersion) {
-                  showUpdateBanner(pendingVersion);
-                }
-              }
-            });
-          }
-        });
-      })
-      .catch(err => console.error('SW Registrierung fehlgeschlagen:', err));
 
     // 4. Controller-Change
     navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -2622,17 +2595,6 @@ if (!document.getElementById('app-animations')) {
     document.head.appendChild(style);
 } 
 
-// === SERVICE WORKER REGISTRIERUNG MIT VERSION (dynamisch) ===
-if ('serviceWorker' in navigator) {
-    const version = new URL(location.href).searchParams.get('v') || '1.5.2.9';
-    const swUrl = `service-worker.js?v=${version}`;
-    navigator.serviceWorker.register(swUrl)
-        .then(reg => {
-            console.log('SW registriert mit Version:', version);
-            registerUpdateListener();
-        })
-        .catch(err => console.error('SW-Registrierung fehlgeschlagen:', err));
-}
 // === CSV IMPORT – 100% SICHER & MIT DEBUG ===
 function importCSV(event) {
     const file = event.target.files[0];
@@ -3031,6 +2993,53 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+// === INSTALLATIONS-FENSTER AUSLÖSEN ===
+window.addEventListener('load', () => {
+    // Warte kurz, bis SW aktiv ist
+    setTimeout(() => {
+        // LÖSE EINEN FETCH AUS (z. B. Bild laden)
+        fetch(`${REPO_PATH}icon-192.png?t=${Date.now()}`)
+            .then(() => console.log('Fetch ausgelöst → PWA-Install bereit'))
+            .catch(() => {});
+    }, 1000);
+});
+
+// === GLOBALE VARIABLEN ===
+let newServiceWorker = null;
+
+// === EINZIGE SERVICE WORKER REGISTRIERUNG ===
+if ('serviceWorker' in navigator) {
+    const version = new URL(location.href).searchParams.get('v') || '1.5.3.0';
+    const swUrl = `service-worker.js?v=${version}`;
+
+    navigator.serviceWorker.register(swUrl)
+        .then(registration => {
+            console.log('SW registriert mit Version:', version);
+
+            // Update gefunden
+            registration.addEventListener('updatefound', () => {
+                newServiceWorker = registration.installing;
+                if (newServiceWorker) {
+                    newServiceWorker.addEventListener('statechange', () => {
+                        if (newServiceWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            showUpdateBanner(version);
+                        }
+                    });
+                }
+            });
+
+            // Sofort prüfen
+            registration.update();
+
+            // Controller-Change → Reload
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                window.location.reload();
+            });
+        })
+        .catch(err => console.error('SW-Registrierung fehlgeschlagen:', err));
+}
+
  </script>  <!-- ← ENDE SCRIPT -->
 
      <!-- Version-Info -->
