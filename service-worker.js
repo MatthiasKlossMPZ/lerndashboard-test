@@ -1,4 +1,5 @@
 // service-worker.js
+<<<<<<< HEAD
 const REPO_PATH = 'https://matthiasklossmpz.github.io/lerndashboard-test/';  // ← WICHTIG: GitHub Pages Pfad
 const VERSION = new URL(self.location).searchParams.get('v') || '1.5.2.7';
 const CACHE_NAME = `lerndashboard-v${VERSION.replace(/\./g, '')}`;
@@ -20,14 +21,34 @@ const urlsToCache = [
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js'
+=======
+const CACHE_NAME = 'lerndashboard-v1';
+
+const urlsToCache = [
+  '/',                     // WICHTIG: Root-Pfad!
+  '/index.html',           // Fallback
+  '/new-resource.html',
+  '/edit-resource.html',
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/icon-maskable-192.png',
+  '/icon-maskable-512.png'
+>>>>>>> origin/main
 ];
 
 // INSTALL
 self.addEventListener('install', event => {
   event.waitUntil(
+<<<<<<< HEAD
     caches.open(CACHE_NAME).then(cache => {
       return cache.addAll(urlsToCache.map(url => new Request(url, { credentials: 'omit' })));
     }).then(() => self.skipWaiting())
+=======
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(urlsToCache))
+      .then(() => self.skipWaiting())
+>>>>>>> origin/main
   );
 });
 
@@ -35,13 +56,18 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => Promise.all(
+<<<<<<< HEAD
       keys.filter(key => !key.startsWith(CACHE_NAME)).map(key => caches.delete(key))
+=======
+      keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+>>>>>>> origin/main
     )).then(() => self.clients.claim())
   );
 });
 
 // FETCH – Navigation → immer index.html
 self.addEventListener('fetch', event => {
+<<<<<<< HEAD
   const requestURL = new URL(event.request.url);
 
   // Nur unsere Domain + CDN cachen
@@ -64,3 +90,16 @@ self.addEventListener('fetch', event => {
     );
   }
 });
+=======
+  const req = event.request;
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetch(req).catch(() => caches.match('/'))
+    );
+  } else {
+    event.respondWith(
+      caches.match(req).then(resp => resp || fetch(req))
+    );
+  }
+});
+>>>>>>> origin/main
