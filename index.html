@@ -1097,7 +1097,7 @@ function registerUpdateListener() {
 
 // === 3. DOMContentLoaded (jetzt sicher!) ===
 document.addEventListener('DOMContentLoaded', () => {
-    const version = new URL(location.href).searchParams.get('v') || '1.5.2.8';
+    const version = new URL(location.href).searchParams.get('v') || '1.5.2.9';
     const versionEl = document.getElementById('versionInfo');
     if (versionEl) versionEl.textContent = `v${version} – © Matthias Kloß MPZ NB`;
 
@@ -1122,7 +1122,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // === 5. SERVICE WORKER ===
 if ('serviceWorker' in navigator) {
-    const version = new URL(location.href).searchParams.get('v') || '1.5.2.8';
+    const version = new URL(location.href).searchParams.get('v') || '1.5.2.9';
     const swUrl = `service-worker.js?v=${version}`;
     navigator.serviceWorker.register(swUrl)
         .then(reg => {
@@ -1477,9 +1477,10 @@ function exportCSV() {
     const blob = new Blob(['\uFEFF' + fullCsv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `LernDashboard_Gefiltert_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `LernDashboard_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
-}
+    // Nach dem Download des CSV
+    showFancyAlert('CSV Export erfolgreich!', 'success');}
 
 function exportPDF() {
     const filtered = getFilteredResources();
@@ -1593,7 +1594,8 @@ function exportPDF() {
     doc.setFontSize(8);
     doc.setTextColor(150);
     doc.text(`Seite ${pageNumber}`, pageWidth - 20, pageHeight - 10);
-    doc.save(`LernDashboard_Gefiltert_${new Date().toISOString().slice(0, 10)}.pdf`);
+    doc.save(`LernDashboard_${new Date().toISOString().slice(0, 10)}.pdf`);
+    showFancyAlert('PDF Export erfolgreich!', 'success');
 }
 
 // === BEARB. BESTÄTIGUNG (ohne Ton) ===
@@ -1781,6 +1783,8 @@ const levelColors = {
     link.href = URL.createObjectURL(blob);
     link.download = `LernDashboard_Matrix_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
+    // Nach: link.click();
+    showFancyAlert('Matrix CSV Export erfolgreich!', 'success');
 }
 // ──────────────────────────────────────────────────────────────
 //  MATRIX → PDF 
@@ -2620,7 +2624,7 @@ if (!document.getElementById('app-animations')) {
 
 // === SERVICE WORKER REGISTRIERUNG MIT VERSION (dynamisch) ===
 if ('serviceWorker' in navigator) {
-    const version = new URL(location.href).searchParams.get('v') || '1.5.2.8';
+    const version = new URL(location.href).searchParams.get('v') || '1.5.2.9';
     const swUrl = `service-worker.js?v=${version}`;
     navigator.serviceWorker.register(swUrl)
         .then(reg => {
@@ -3021,6 +3025,7 @@ function showFancyAlert(title, type = 'info', subtitle = '') {
         setTimeout(() => modal.remove(), 300);
     };
 }
+
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
