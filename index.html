@@ -2470,27 +2470,39 @@ banner.querySelector('#updateNowBtn').onclick = () => {
         
 // Service Worker Update-Handling
 function registerUpdateListener() {
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.ready.then(registration => {
-            registration.addEventListener('updatefound', () => {
-                newServiceWorker = registration.installing;
-                if (newServiceWorker) {
-                    newServiceWorker.addEventListener('statechange', () => {
-                        if (newServiceWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            const pendingVersion = localStorage.getItem(PENDING_UPDATE_KEY);
-                            if (pendingVersion) {
-                                showUpdateBanner(pendingVersion); // KORREKT!
-                            }
-                        }
-                    });
-                }
-            });
-        });
+  if ('serviceWorker' in navigator) {
+    // 1. Registrierung mit Cache-Busting
+    const swUrl = `service-worker.js?t=${Date.now()}`;
+    navigator.serviceWorker.register(swUrl)
+      .then(registration => {
+        console.log('SW registriert:', registration.scope);
 
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-            localStorage.removeItem(PENDING_UPDATE_KEY);
+        // 2. Update sofort prüfen
+        registration.update();
+
+        // 3. Update-Events
+        registration.addEventListener('updatefound', () => {
+          newServiceWorker = registration.installing;
+          if (newServiceWorker) {
+            newServiceWorker.addEventListener('statechange', () => {
+              if (newServiceWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                const pendingVersion = localStorage.getItem(PENDING_UPDATE_KEY);
+                if (pendingVersion) {
+                  showUpdateBanner(pendingVersion);
+                }
+              }
+            });
+          }
         });
-    }
+      })
+      .catch(err => console.error('SW Registrierung fehlgeschlagen:', err));
+
+    // 4. Controller-Change
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      localStorage.removeItem(PENDING_UPDATE_KEY);
+      window.location.reload(); // Optional: Auto-Reload
+    });
+  }
 }
 
 // Starte Prüfung

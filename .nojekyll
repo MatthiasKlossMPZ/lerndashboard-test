@@ -1,0 +1,4 @@
+echo "" > .nojekyll
+git add .nojekyll
+git commit -m "Fix 404: .nojekyll"
+git push

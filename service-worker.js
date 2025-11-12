@@ -22,6 +22,7 @@ const urlsToCache = [
   'https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js'
 ];
 
+// INSTALL
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
@@ -30,6 +31,7 @@ self.addEventListener('install', event => {
   );
 });
 
+// AKTIVIEREN – alten Cache löschen
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => Promise.all(
@@ -38,6 +40,7 @@ self.addEventListener('activate', event => {
   );
 });
 
+// FETCH – Navigation → immer index.html
 self.addEventListener('fetch', event => {
   const requestURL = new URL(event.request.url);
 
