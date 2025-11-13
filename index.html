@@ -2498,16 +2498,17 @@ function showUpdateBanner(version) {
     document.body.appendChild(banner);
 
     // UPDATE JETZT
-    banner.querySelector('#updateNowBtn').onclick = () => {
-        banner.style.opacity = '0';
-        banner.style.transition = 'opacity 0.3s ease';
-        
-        if (newServiceWorker) {
-            newServiceWorker.postMessage({ action: 'skipWaiting' });
-        }
-        
-        setTimeout(() => window.location.reload(), 500);
-    };
+banner.querySelector('#updateNowBtn').onclick = () => {
+    const currentBanner = document.getElementById('updateBanner');
+    if (currentBanner) {
+        currentBanner.style.opacity = '0';
+        currentBanner.style.transition = 'opacity 0.3s ease';
+    }
+    if (newServiceWorker) {
+        newServiceWorker.postMessage({ action: 'skipWaiting' });
+    }
+    setTimeout(() => window.location.reload(), 500);
+};
 
     // SCHLIESSEN
     banner.querySelector('#closeBtn').onclick = () => {
@@ -2559,19 +2560,17 @@ function showUpdateReady() {
     `;
     document.body.appendChild(banner);
 
-banner.querySelector('#updateNowBtn').onclick = () => {
-    banner.style.opacity = '0';
-    banner.style.transition = 'opacity 0.3s ease';
-    
+banner.querySelector('#installUpdateBtn').onclick = () => {
+    const currentBanner = document.getElementById('updateReadyBanner');
+    if (currentBanner) {
+        currentBanner.style.opacity = '0';
+        currentBanner.style.transition = 'opacity 0.3s ease';
+    }
     if (newServiceWorker) {
         newServiceWorker.postMessage({ action: 'skipWaiting' });
     }
-
-    setTimeout(() => {
-        window.location.reload();
-    }, 500);
+    setTimeout(() => window.location.reload(), 500);
 };
-}
 
     // 4. Controller-Change
     navigator.serviceWorker.addEventListener('controllerchange', () => {

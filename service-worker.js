@@ -1,6 +1,6 @@
 // service-worker.js
-const REPO_PATH = 'https://matthiasklossmpz.github.io/lerndashboard-test/';  // ← WICHTIG: GitHub Pages Pfad
-const VERSION = new URL(self.location).searchParams.get('v') || '1.5.2.7';
+const REPO_PATH = 'https://matthiasklossmpz.github.io/lerndashboard-test/'; // ← WICHTIG: GitHub Pages Pfad
+const VERSION = new URL(self.location).searchParams.get('v') || '1.5.3.0'; // ÄNDERUNG 1: Default-Version aktualisiert
 const CACHE_NAME = `lerndashboard-v${VERSION.replace(/\./g, '')}`;
 
 const urlsToCache = [
@@ -22,12 +22,23 @@ const urlsToCache = [
   'https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js'
 ];
 
+// ÄNDERUNG 2: skipWaiting() via Message empfangen
+self.addEventListener('message', event => {
+  if (event.data && event.data.action === 'skipWaiting') {
+    console.log('skipWaiting() aufgerufen vom Client');
+    self.skipWaiting();
+  }
+});
+
 // INSTALL
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
       return cache.addAll(urlsToCache.map(url => new Request(url, { credentials: 'omit' })));
-    }).then(() => self.skipWaiting())
+    }).then(() => {
+      console.log(`Service Worker v${VERSION} installiert`);
+      self.skipWaiting();
+    })
   );
 });
 
@@ -36,7 +47,10 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys => Promise.all(
       keys.filter(key => !key.startsWith(CACHE_NAME)).map(key => caches.delete(key))
-    )).then(() => self.clients.claim())
+    )).then(() => {
+      console.log(`Service Worker v${VERSION} aktiviert – alte Caches gelöscht`);
+      self.clients.claim();
+    })
   );
 });
 
