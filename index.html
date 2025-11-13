@@ -1116,8 +1116,6 @@ document.addEventListener('DOMContentLoaded', () => {
         applyFilters();
         dropdownsInitialized = true;
     }
-
-    // Tooltips, Cache-Busting...
 });
 
 // === 4. UPDATE-CHECK ===
@@ -3006,8 +3004,8 @@ let newServiceWorker = null;
 // === EINZIGE SERVICE WORKER REGISTRIERUNG ===
 if ('serviceWorker' in navigator) {
     const url = new URL(location.href);
-    const version = url.searchParams.get('v') || '1.5.3.1';
-    const swUrl = `service-worker.js?v=${version}`;
+    const version = url.searchParams.get('v') || '1.5.3.1'; // ← aktuelle Version!
+    const swUrl = `service-worker.js?v=${version}&t=${Date.now()}`; // ← Cache-Busting!
 
     navigator.serviceWorker.register(swUrl)
         .then(registration => {
@@ -3044,8 +3042,9 @@ if ('serviceWorker' in navigator) {
         });
 
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-        window.location.reload();
-    });
+    console.log('Controller gewechselt → reload');
+    window.location.reload(); // Sofort!
+});
 }
 
  </script>  <!-- ← ENDE SCRIPT -->

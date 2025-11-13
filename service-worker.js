@@ -1,6 +1,7 @@
 // service-worker.js
-const REPO_PATH = 'https://matthiasklossmpz.github.io/lerndashboard-test/'; // ← WICHTIG: GitHub Pages Pfad
-const VERSION = new URL(self.location).searchParams.get('v') || '1.5.3.1'; // ÄNDERUNG 1: Default-Version aktualisiert
+
+const REPO_PATH = 'https://matthiasklossmpz.github.io/lerndashboard-test/';
+const VERSION = new URL(self.location).searchParams.get('v') || '1.5.3.1';
 const CACHE_NAME = `lerndashboard-v${VERSION.replace(/\./g, '')}`;
 
 const urlsToCache = [
@@ -24,57 +25,52 @@ const urlsToCache = [
 
 // ÄNDERUNG 2: skipWaiting() via Message empfangen
 self.addEventListener('message', event => {
-  if (event.data && event.data.action === 'skipWaiting') {
-    console.log('skipWaiting() aufgerufen vom Client');
-    self.skipWaiting();
-  }
+    if (event.data && event.data.action === 'skipWaiting') {
+        console.log('skipWaiting() empfangen');
+        self.skipWaiting();
+    }
 });
 
-// INSTALL
+// INSTALL – KEIN automatisches skipWaiting!
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(urlsToCache.map(url => new Request(url, { credentials: 'omit' })));
-    }).then(() => {
-      console.log(`Service Worker v${VERSION} installiert`);
-      self.skipWaiting();
-    })
-  );
-});
-
-// AKTIVIEREN – alten Cache löschen
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys.filter(key => !key.startsWith(CACHE_NAME)).map(key => caches.delete(key))
-    )).then(() => {
-      console.log(`Service Worker v${VERSION} aktiviert – alte Caches gelöscht`);
-      self.clients.claim();
-    })
-  );
-});
-
-// FETCH – Navigation → immer index.html
-self.addEventListener('fetch', event => {
-  const requestURL = new URL(event.request.url);
-
-  // Nur unsere Domain + CDN cachen
-  if (requestURL.origin === location.origin || requestURL.hostname.includes('cdnjs.cloudflare.com')) {
-    event.respondWith(
-      caches.match(event.request).then(response => {
-        return response || fetch(event.request).then(networkResponse => {
-          // Cache erfolgreiche Antworten
-          if (networkResponse.ok) {
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, networkResponse.clone()));
-          }
-          return networkResponse;
-        });
-      }).catch(() => {
-        // Fallback: index.html bei 404
-        if (event.request.mode === 'navigate') {
-          return caches.match(`${REPO_PATH}/index.html`);
-        }
-      })
+    event.waitUntil(
+        caches.open(CACHE_NAME).then(cache => {
+            return cache.addAll(urlsToCache.map(url => new Request(url, { credentials: 'omit' })));
+        }).then(() => {
+            console.log(`Service Worker v${VERSION} installiert – wartet auf Klick`);
+        })
     );
-  }
+});
+
+// AKTIVIEREN – clients.claim() bleibt!
+self.addEventListener('activate', event => {
+    event.waitUntil(
+        caches.keys().then(keys => Promise.all(
+            keys.filter(key => !key.startsWith(CACHE_NAME)).map(key => caches.delete(key))
+        )).then(() => {
+            console.log(`Service Worker v${VERSION} aktiviert`);
+            return self.clients.claim();
+        })
+    );
+});
+
+// FETCH – bleibt unverändert
+self.addEventListener('fetch', event => {
+    const requestURL = new URL(event.request.url);
+    if (requestURL.origin === location.origin || requestURL.hostname.includes('cdnjs.cloudflare.com')) {
+        event.respondWith(
+            caches.match(event.request).then(response => {
+                return response || fetch(event.request).then(networkResponse => {
+                    if (networkResponse.ok) {
+                        caches.open(CACHE_NAME).then(cache => cache.put(event.request, networkResponse.clone()));
+                    }
+                    return networkResponse;
+                });
+            }).catch(() => {
+                if (event.request.mode === 'navigate') {
+                    return caches.match(`${REPO_PATH}/index.html`);
+                }
+            })
+        );
+    }
 });
