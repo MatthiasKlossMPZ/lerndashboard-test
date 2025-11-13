@@ -13,6 +13,14 @@
 
     <!-- DYNAMISCHER JSPDF-LOADER -->
 <script>
+
+// === REPO_PATH FÜR INDEX.HTML (ganz oben!) ===
+const REPO_PATH = (
+    location.hostname === 'localhost' || 
+    location.hostname === '127.0.0.1' || 
+    location.protocol === 'file:'
+) ? '/' : 'https://matthiasklossmpz.github.io/lerndashboard-test/';
+
     window.jspdfLoaded = false;
 
     const jspdfScript = document.createElement('script');
