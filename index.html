@@ -13,11 +13,10 @@
 
     <!-- DYNAMISCHER JSPDF-LOADER -->
 <script>
-
-// === REPO_PATH FÜR INDEX.HTML (ganz oben!) ===
+ // @ts-nocheck  
 const REPO_PATH = (
-    location.hostname === 'localhost' || 
-    location.hostname === '127.0.0.1' || 
+    location.hostname === 'localhost' ||
+    location.hostname === '127.0.0.1' ||
     location.protocol === 'file:'
 ) ? '/' : 'https://matthiasklossmpz.github.io/lerndashboard-test/';
 
@@ -1127,18 +1126,6 @@ document.addEventListener('DOMContentLoaded', () => {
     checkForAppUpdate();
     window.addEventListener('focus', checkForAppUpdate);
 });
-
-// === 5. SERVICE WORKER ===
-if ('serviceWorker' in navigator) {
-    const version = new URL(location.href).searchParams.get('v') || '1.5.3.0';
-    const swUrl = `service-worker.js?v=${version}`;
-    navigator.serviceWorker.register(swUrl)
-        .then(reg => {
-            console.log('SW registriert mit Version:', version);
-            registerUpdateListener();
-        })
-        .catch(err => console.error('SW-Registrierung fehlgeschlagen:', err));
-}
 
     function updateSubjectBarStats(filtered) {
         const count = filtered.reduce((a, r) => (a[r.subject] = (a[r.subject] || 0) + 1, a), {});
@@ -2460,6 +2447,7 @@ function printOptimized() {
 }
 
 // === UPDATE BANNER – KLICKBAR & 10 SEKUNDEN ===
+// @ts-nocheck
 function showUpdateBanner(version) {
     if (document.getElementById('updateBanner')) return;
 
@@ -2537,6 +2525,7 @@ banner.querySelector('#updateNowBtn').onclick = () => {
 }
         
 // === UPDATE-BANNER MIT "JETZT INSTALLIEREN" ===
+// @ts-nocheck
 function showUpdateReady() {
     if (document.getElementById('updateReadyBanner')) return;
 
@@ -3016,34 +3005,47 @@ let newServiceWorker = null;
 
 // === EINZIGE SERVICE WORKER REGISTRIERUNG ===
 if ('serviceWorker' in navigator) {
-    const version = new URL(location.href).searchParams.get('v') || '1.5.3.0';
+    const url = new URL(location.href);
+    const version = url.searchParams.get('v') || '1.5.3.0';
     const swUrl = `service-worker.js?v=${version}`;
 
     navigator.serviceWorker.register(swUrl)
         .then(registration => {
             console.log('SW registriert mit Version:', version);
 
-            // Update gefunden
+            // UPDATE GEFUNDEN
             registration.addEventListener('updatefound', () => {
-                newServiceWorker = registration.installing;
-                if (newServiceWorker) {
-                    newServiceWorker.addEventListener('statechange', () => {
-                        if (newServiceWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            showUpdateBanner(version);
-                        }
-                    });
+                const installing = registration.installing;
+                if (installing) {
+                    newServiceWorker = installing;
+                    showUpdateBanner(version);
                 }
             });
 
-            // Sofort prüfen
-            registration.update();
+            // UPDATE BEREIT
+            const waiting = registration.waiting;
+            const installing = registration.installing;
 
-            // Controller-Change → Reload
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
-                window.location.reload();
-            });
+            if (installing) newServiceWorker = installing;
+            else if (waiting) newServiceWorker = waiting;
+
+            if (newServiceWorker) {
+                newServiceWorker.addEventListener('statechange', () => {
+                    if (newServiceWorker?.state === 'installed' && navigator.serviceWorker.controller) {
+                        showUpdateReady();
+                    }
+                });
+            }
+
+            registration.update();
         })
-        .catch(err => console.error('SW-Registrierung fehlgeschlagen:', err));
+        .catch(err => {
+            console.error('SW-Registrierung fehlgeschlagen:', err);
+        });
+
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+        window.location.reload();
+    });
 }
 
  </script>  <!-- ← ENDE SCRIPT -->
