@@ -1104,7 +1104,7 @@ function registerUpdateListener() {
 
 // === 3. DOMContentLoaded (jetzt sicher!) ===
 document.addEventListener('DOMContentLoaded', () => {
-    const version = new URL(location.href).searchParams.get('v') || '1.5.3.0';
+    const version = new URL(location.href).searchParams.get('v') || '1.5.3.1';
     const versionEl = document.getElementById('versionInfo');
     if (versionEl) versionEl.textContent = `v${version} – © Matthias Kloß MPZ NB`;
 
@@ -3006,7 +3006,7 @@ let newServiceWorker = null;
 // === EINZIGE SERVICE WORKER REGISTRIERUNG ===
 if ('serviceWorker' in navigator) {
     const url = new URL(location.href);
-    const version = url.searchParams.get('v') || '1.5.3.0';
+    const version = url.searchParams.get('v') || '1.5.3.1';
     const swUrl = `service-worker.js?v=${version}`;
 
     navigator.serviceWorker.register(swUrl)
