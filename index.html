@@ -1076,7 +1076,7 @@ function registerUpdateListener() {
 
 // === 3. DOMContentLoaded (jetzt sicher!) ===
 document.addEventListener('DOMContentLoaded', () => {
-    const version = targetVersion || new URL(location.href).searchParams.get('v') || '1.5.3.6';
+    const version = targetVersion || new URL(location.href).searchParams.get('v') || '1.5.3.7';
     const versionEl = document.getElementById('versionInfo');
     if (versionEl) versionEl.textContent = `v${version} – © Matthias Kloß MPZ NB`;
 
