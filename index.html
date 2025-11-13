@@ -832,6 +832,13 @@ let resources = JSON.parse(localStorage.getItem('resources') || '[]');
 let tools = new Set(resources.map(r => r.tool?.trim().toLowerCase()).filter(Boolean));
 let dropdownsInitialized = false;
 
+// === REPO_PATH – für GitHub Pages & lokal ===
+const REPO_PATH = (
+  location.hostname === 'localhost' ||
+  location.hostname === '127.0.0.1' ||
+  location.protocol === 'file:'
+) ? '/' : 'https://matthiasklossmpz.github.io/lerndashboard-test';
+
 // === DATEN FÜR DROPDOWNS ===
 const subjects = ['Deutsch','Mathematik','Englisch','Biologie','Chemie','Physik','Geschichte','Geografie','Politik','Wirtschaft','Informatik','Kunst','Musik','Sport','Ethik','Religion'];
 const grades = ['Klasse 5','Klasse 6','Klasse 7','Klasse 8','Klasse 9','Klasse 10','Klasse 11','Klasse 12','Klasse 13'];
