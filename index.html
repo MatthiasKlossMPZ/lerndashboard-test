@@ -11,60 +11,25 @@
     <link rel="prefetch" href="edit-resource.html">
     <link rel="prefetch" href="new-resource.html">
 
-    <!-- DYNAMISCHER JSPDF-LOADER -->
+<!-- Lokale Bibliotheken (für Offline-Betrieb) -->
+<script src="libs/jspdf.umd.min.js"></script>
+<script src="libs/jspdf.plugin.autotable.min.js"></script>
+<script src="libs/jszip.min.js"></script>
+<script src="libs/exceljs.min.js"></script>
+<script src="libs/FileSaver.min.js"></script>
+
 <script>
- // @ts-nocheck  
-const REPO_PATH = (
-    location.hostname === 'localhost' ||
-    location.hostname === '127.0.0.1' ||
-    location.protocol === 'file:'
-) ? '/' : 'https://matthiasklossmpz.github.io/lerndashboard-test/';
-
-    window.jspdfLoaded = false;
-
-    const jspdfScript = document.createElement('script');
-    jspdfScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-
-    jspdfScript.onload = () => {
-        const autotableScript = document.createElement('script');
-        autotableScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
-
-        autotableScript.onload = () => {
-            window.jspdfLoaded = true;
-            console.log('jsPDF + autoTable erfolgreich geladen');
-
-            // BUTTON AKTIVIEREN
-            const matrixBtn = document.getElementById('matrixPdfBtn');
-            if (matrixBtn) {
-                matrixBtn.disabled = false;
-                matrixBtn.textContent = 'Matrix PDF';
-                matrixBtn.onclick = exportMatrixPDF; // Jetzt sicher zuweisen
-            }
-        };
-
-        autotableScript.onerror = () => {
-            console.error('Fehler beim Laden von jsPDF autoTable');
-            alert('Fehler: PDF-Export (Matrix) konnte nicht geladen werden.');
-        };
-
-        document.head.appendChild(autotableScript);
-    };
-
-    jspdfScript.onerror = () => {
-        console.error('Fehler beim Laden von jsPDF');
-        alert('Fehler: PDF-Bibliothek konnte nicht geladen werden.');
-    };
-
-    document.head.appendChild(jspdfScript);
-
-    // Optional: Ladehinweis im Button anzeigen
-
+  // jsPDF ist jetzt sofort verfügbar → Button direkt aktivieren
+  document.addEventListener('DOMContentLoaded', () => {
+    const matrixBtn = document.getElementById('matrixPdfBtn');
+    if (matrixBtn) {
+      matrixBtn.disabled = false;
+      matrixBtn.textContent = 'Matrix PDF';
+      matrixBtn.onclick = exportMatrixPDF;
+    }
+  });
 </script>
 
-    <!-- jsPDF + Autotable (für Tabellen in PDF) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
     .logo-header {
         display: flex;
@@ -1789,34 +1754,6 @@ async function exportMatrixPDF() {
         return;
     }
 
-    if (!window.jspdfLoaded) {
-        showFancyAlert('jsPDF wird geladen...', 'info');
-        await new Promise((resolve, reject) => {
-            if (window.jspdf) {
-                resolve();
-                return;
-            }
-            const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-            script.onload = () => {
-                const autoScript = document.createElement('script');
-                autoScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
-                autoScript.onload = () => {
-                    window.jspdfLoaded = true;
-                    resolve();
-                };
-                autoScript.onerror = reject;
-                document.head.appendChild(autoScript);
-            };
-            script.onerror = reject;
-            document.head.appendChild(script);
-        }).catch(err => {
-            console.error('jsPDF Laden fehlgeschlagen:', err);
-            showAlert('PDF-Bibliothek konnte nicht geladen werden. Bitte Seite neu laden.');
-            return;
-        });
-    }
-
     try {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('l', 'mm', 'a4');
@@ -2125,7 +2062,7 @@ function exportMatrixExcel() {
 
     // === EXPORT MIT BESTÄTIGUNG ===
     workbook.xlsx.writeBuffer().then(buffer => {
-        const blob = new Blob([buffer], { type: 'application/octet-stream' });
+        const excelBlob = new Blob([buffer], { type: 'application/octet-stream' });
         saveAs(blob, `Kompetenzmatrix_${new Date().toISOString().slice(0,10)}.xlsx`);
         showFancyAlert('Excel-Matrix erfolgreich erstellt!', 'success');
     }).catch(err => {
@@ -2246,7 +2183,7 @@ function autoBackup() {
             ].join(','))
         ].join('\n');
 
-        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const csvBlob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
