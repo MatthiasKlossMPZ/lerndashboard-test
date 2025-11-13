@@ -2444,150 +2444,6 @@ function printOptimized() {
     }, 500);
 }
 
-// === UPDATE BANNER – KLICKBAR & 10 SEKUNDEN ===
-// @ts-nocheck
-function showUpdateBanner(version) {
-    if (document.getElementById('updateBanner')) return;
-
-    const banner = document.createElement('div');
-    banner.id = 'updateBanner';
-    banner.style.cssText = `
-        position: fixed !important;
-        top: 20px !important;
-        right: 20px !important;
-        z-index: 2147483647 !important;
-        background: linear-gradient(135deg, #27ae60, #2ecc71);
-        color: white;
-        padding: 16px 24px;
-        border-radius: 16px;
-        box-shadow: 0 8px 32px rgba(46,204,113,0.4);
-        font-size: 15px;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        max-width: 380px;
-        animation: slideIn 0.5s ease;
-        pointer-events: auto !important;
-    `;
-
-    banner.innerHTML = `
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-        </svg>
-        <div>
-            <strong>Update verfügbar!</strong><br>
-            <span style="font-weight: normal; font-size: 13px;">v${version}</span>
-        </div>
-        <button id="updateNowBtn" style="
-            background: white; color: #27ae60; border: none; border-radius: 10px;
-            padding: 8px 16px; font-weight: 600; cursor: pointer; font-size: 14px;
-        ">Jetzt aktualisieren</button>
-        <button id="closeBtn" style="
-            background: none; border: none; color: white; font-size: 20px;
-            cursor: pointer; margin-left: 8px;
-        ">×</button>
-    `;
-
-    document.body.appendChild(banner);
-
-    // UPDATE JETZT
-banner.querySelector('#updateNowBtn').onclick = () => {
-    const currentBanner = document.getElementById('updateBanner');
-    if (currentBanner) {
-        currentBanner.style.opacity = '0';
-        currentBanner.style.transition = 'opacity 0.3s ease';
-    }
-    if (newServiceWorker) {
-        newServiceWorker.postMessage({ action: 'skipWaiting' });
-    }
-    setTimeout(() => window.location.reload(), 500);
-};
-
-    // SCHLIESSEN
-    banner.querySelector('#closeBtn').onclick = () => {
-        banner.style.opacity = '0';
-        banner.style.transition = 'opacity 0.3s ease';
-        setTimeout(() => banner.remove(), 300);
-    };
-
-    // Auto-Schließen nach 15 Sekunden
-    setTimeout(() => {
-        const b = document.getElementById('updateBanner');
-        if (b) {
-            b.style.opacity = '0';
-            b.style.transition = 'opacity 0.5s ease';
-            setTimeout(() => b.remove(), 500);
-        }
-    }, 15000);
-}
-        
-// === UPDATE-BANNER MIT "JETZT INSTALLIEREN" ===
-// @ts-nocheck
-function showUpdateReady() {
-    if (document.getElementById('updateReadyBanner')) return;
-
-    const banner = document.createElement('div');
-    banner.id = 'updateReadyBanner';
-    banner.style.cssText = `
-        position: fixed; top: 20px; right: 20px; z-index: 9999;
-        background: linear-gradient(135deg, #27ae60, #2ecc71); color: white;
-        padding: 16px 24px; border-radius: 16px; box-shadow: 0 8px 32px rgba(46,204,113,0.4);
-        font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 14px;
-        max-width: 380px; animation: slideIn 0.5s ease;
-    `;
-    banner.innerHTML = `
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-        </svg>
-        <div>
-            <strong>Update verfügbar!</strong><br>
-            <span style="font-weight: normal; font-size: 13px;">Neue Version ist bereit</span>
-        </div>
-        <button id="installUpdateBtn" style="
-            background: white; color: #27ae60; border: none; border-radius: 10px;
-            padding: 8px 16px; font-weight: 600; cursor: pointer; font-size: 14px;
-        ">Jetzt installieren</button>
-        <button onclick="this.parentElement.remove()" style="
-            background: none; border: none; color: rgba(255,255,255,0.8);
-            font-size: 20px; cursor: pointer; margin-left: 8px;
-        ">×</button>
-    `;
-    document.body.appendChild(banner);
-
-banner.querySelector('#installUpdateBtn').onclick = () => {
-    const currentBanner = document.getElementById('updateReadyBanner');
-    if (currentBanner) {
-        currentBanner.style.opacity = '0';
-        currentBanner.style.transition = 'opacity 0.3s ease';
-    }
-    if (newServiceWorker) {
-        newServiceWorker.postMessage({ action: 'skipWaiting' });
-    }
-    setTimeout(() => window.location.reload(), 500);
-};
-
-    // 4. Controller-Change
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      localStorage.removeItem(PENDING_UPDATE_KEY);
-      window.location.reload(); // Optional: Auto-Reload
-    });
-  }
-
-// === EINMALIGE ANIMATIONEN ===
-if (!document.getElementById('app-animations')) {
-    const style = document.createElement('style');
-    style.id = 'app-animations';
-    style.textContent = `
-        @keyframes draw { to { stroke-dashoffset: 0; } }
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-    `;
-    document.head.appendChild(style);
-} 
-
 // === CSV IMPORT – 100% SICHER & MIT DEBUG ===
 function importCSV(event) {
     const file = event.target.files[0];
@@ -2999,52 +2855,90 @@ window.addEventListener('load', () => {
 });
 
 // === GLOBALE VARIABLEN ===
-let newServiceWorker = null;
+let newWorker = null;
 
-// === EINZIGE SERVICE WORKER REGISTRIERUNG ===
+// === EINZIGES UPDATE-BANNER ===
+function showUpdateReady() {
+  if (document.getElementById('updateBanner')) return;
+
+  const banner = document.createElement('div');
+  banner.id = 'updateBanner';
+  banner.innerHTML = `
+    <div style="background: linear-gradient(135deg, #27ae60, #2ecc71); color: white; padding: 16px 24px; border-radius: 16px; box-shadow: 0 8px 32px rgba(46,204,113,0.4); display: flex; align-items: center; gap: 14px; font-size: 15px; font-weight: 600; max-width: 380px; animation: slideIn 0.5s ease;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+      </svg>
+      <div>
+        <strong>Update verfügbar!</strong><br>
+        <span style="font-size: 13px;">Neue Version bereit</span>
+      </div>
+      <button id="installNow" style="background: white; color: #27ae60; border: none; border-radius: 10px; padding: 8px 16px; font-weight: 600; cursor: pointer;">Jetzt installieren</button>
+      <button id="closeBanner" style="background: none; border: none; color: white; font-size: 20px; cursor: pointer; margin-left: 8px;">×</button>
+    </div>
+  `;
+  document.body.appendChild(banner);
+
+  // Installieren
+  banner.querySelector('#installNow').onclick = () => {
+    if (!newWorker) return;
+    banner.style.opacity = '0';
+    banner.style.transition = 'opacity 0.3s ease';
+    newWorker.postMessage({ action: 'skipWaiting' });
+  };
+
+  // Schließen
+  banner.querySelector('#closeBanner').onclick = () => {
+    banner.remove();
+  };
+
+  // Auto-Schließen nach 15 Sekunden
+  setTimeout(() => {
+    const b = document.getElementById('updateBanner');
+    if (b) b.remove();
+  }, 15000);
+}
+
+// === ANIMATION FÜR BANNER (einmalig) ===
+if (!document.getElementById('app-animations')) {
+  const style = document.createElement('style');
+  style.id = 'app-animations';
+  style.textContent = `
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+
+// === SERVICE WORKER REGISTRIERUNG ===
 if ('serviceWorker' in navigator) {
-    const url = new URL(location.href);
-    const version = url.searchParams.get('v') || '1.5.3.2'; // ← aktuelle Version!
-    const swUrl = `service-worker.js?v=${version}&t=${Date.now()}`; // ← Cache-Busting!
+  const swUrl = `service-worker.js?v=${Date.now()}`; // Cache-Busting
+  navigator.serviceWorker.register(swUrl).then(reg => {
+    console.log('SW registriert');
 
-    navigator.serviceWorker.register(swUrl)
-        .then(registration => {
-            console.log('SW registriert mit Version:', version);
-
-            // UPDATE GEFUNDEN
-            registration.addEventListener('updatefound', () => {
-                const installing = registration.installing;
-                if (installing) {
-                    newServiceWorker = installing;
-                    showUpdateBanner(version);
-                }
-            });
-
-            // UPDATE BEREIT
-            const waiting = registration.waiting;
-            const installing = registration.installing;
-
-            if (installing) newServiceWorker = installing;
-            else if (waiting) newServiceWorker = waiting;
-
-            if (newServiceWorker) {
-                newServiceWorker.addEventListener('statechange', () => {
-                    if (newServiceWorker?.state === 'installed' && navigator.serviceWorker.controller) {
-                        showUpdateReady();
-                    }
-                });
-            }
-
-            registration.update();
-        })
-        .catch(err => {
-            console.error('SW-Registrierung fehlgeschlagen:', err);
+    // Update gefunden?
+    reg.addEventListener('updatefound', () => {
+      const installingWorker = reg.installing;
+      if (installingWorker) {
+        installingWorker.addEventListener('statechange', () => {
+          if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            newWorker = installingWorker;
+            showUpdateReady(); // Zeige Banner
+          }
         });
+      }
+    });
 
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-    console.log('Controller gewechselt → reload');
-    window.location.reload(); // Sofort!
-});
+    // Sofort prüfen
+    reg.update();
+  });
+
+  // Bei Controller-Wechsel: Seite neu laden
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
 }
 
  </script>  <!-- ← ENDE SCRIPT -->
