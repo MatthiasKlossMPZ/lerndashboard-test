@@ -18,18 +18,6 @@
 <script src="libs/exceljs.min.js"></script>
 <script src="libs/FileSaver.min.js"></script>
 
-<script>
-  // jsPDF ist jetzt sofort verfügbar → Button direkt aktivieren
-  document.addEventListener('DOMContentLoaded', () => {
-    const matrixBtn = document.getElementById('matrixPdfBtn');
-    if (matrixBtn) {
-      matrixBtn.disabled = false;
-      matrixBtn.textContent = 'Matrix PDF';
-      matrixBtn.onclick = exportMatrixPDF;
-    }
-  });
-</script>
-
     <style>
     .logo-header {
         display: flex;
@@ -158,8 +146,6 @@
     .btn { background: var(--primary); color: white; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: normal; transition: 0.2s; }
     .btn:hover { opacity: 0.9; transform: translateY(-1px); }
     .file-input { display: none; }
-    .new-resource-btn { display: block; margin: 20px auto; padding: 14px 28px; font-size: 17px; font-weight: 700; background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; border: none; border-radius: 12px; cursor: pointer; box-shadow: 0 6px 16px rgba(107,70,193,0.3); transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 8px; max-width: 360px; }
-    .new-resource-btn:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(107,70,193,0.4); }
     .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin: 16px 0; }
     .stat-card { background: var(--card); padding: 12px; border-radius: 10px; text-align: center; box-shadow: var(--shadow); font-weight: 600; }
     .stat-card span { display: block; font-size: 22px; color: var(--primary); margin-top: 6px; }
@@ -827,12 +813,15 @@
     </svg>
 
 <script>
-// === 1. DATEN LADEN ===
+// === GLOBALE VERSION ===
+const VERSION = '1.5.3.9';
+
+// === RESSOURCEN LADEN (VOR ALLEM ANDEREN!) ===
 let resources = JSON.parse(localStorage.getItem('resources') || '[]');
 let tools = new Set(resources.map(r => r.tool?.trim().toLowerCase()).filter(Boolean));
 let dropdownsInitialized = false;
 
-// === REPO_PATH – für GitHub Pages & lokal ===
+// === REPO_PATH ===
 const REPO_PATH = (
   location.hostname === 'localhost' ||
   location.hostname === '127.0.0.1' ||
@@ -941,15 +930,6 @@ function populateDropdowns() {
     updateToolFilter();
 }
 
-// --- applyFilters ---
-function applyFilters() {
-    const filtered = getFilteredResources();
-    displayResources(filtered);
-    updateStats();
-    updateFilterHighlight();
-    updateFilterStatus();
-}
-
 // --- getFilteredResources ---
 function getFilteredResources() {
     const f = {
@@ -980,51 +960,6 @@ function getFilteredResources() {
     });
 }
 
-// --- displayResources ---
-function displayResources(list) {
-    const c = document.getElementById('resourcesList');
-    if (!c) return;
-    c.innerHTML = '';
-    list.forEach((r, i) => {
-        const realIndex = resources.findIndex(res =>
-            res.topic === r.topic &&
-            res.subject === r.subject &&
-            res.grade === r.grade &&
-            res.competence === r.competence &&
-            (res.tool || '') === (r.tool || '') &&
-            (res.description || '') === (r.description || '')
-        );
-        const d = document.createElement('div');
-        d.className = 'resource-item';
-        d.dataset.index = realIndex >= 0 ? realIndex : i;
-        d.innerHTML = `
-            <div class="resource-content">
-                <strong>${r.topic}</strong>
-                <span class="tag subject-tag" onclick="setFilterAndApply('filterSubject', '${escapeJs(r.subject)}')">${r.subject}</span>
-                <span class="tag grade-tag" onclick="setFilterAndApply('filterGrade', '${escapeJs(r.grade)}')">${r.grade}</span>
-                <span class="tag competence-tag" onclick="setFilterAndApply('filterCompetence', '${escapeJs(r.competence)}')">${r.competence}</span>
-                <span class="tag level-tag">${r.level || '—'}</span>
-               ${r.tool ? `<span class="tag tool-tag" onclick="setFilterAndApply('filterTool', '${escapeJs(r.tool.toLowerCase())}')">${escapeJs(r.tool)}</span>` : ''}
-                ${r.description ? `<div class="description">${r.description}</div>` : ''}
-            </div>
-            <div class="action-icons">
-                <div class="action-icon favorite-icon ${r.favorite ? 'active' : ''}"
-                     onclick="toggleFavorite(${realIndex})">
-                    <svg><use xlink:href="#star-icon"/></svg>
-                </div>
-                <div class="action-icon edit-icon"
-                     onclick="editResource(${realIndex})">
-                    <svg><use xlink:href="#edit-icon"/></svg>
-                </div>
-                <div class="action-icon delete-icon"
-                     onclick="deleteResource(${realIndex})">
-                    <svg><use xlink:href="#delete-icon"/></svg>
-                </div>
-            </div>`;
-        c.appendChild(d);
-    });
-}
-
 // --- updateStats ---
 function updateStats() {
     const filtered = getFilteredResources();
@@ -1032,11 +967,11 @@ function updateStats() {
     document.getElementById('statFavorites').textContent = filtered.filter(r => r.favorite).length;
     document.getElementById('statTools').textContent = [...new Set(filtered.map(r => r.tool).filter(Boolean))].length;
     document.getElementById('statSubjects').textContent = [...new Set(filtered.map(r => r.subject))].length;
-    updateSubjectBarStats(filtered);
+    updateSubjectStats(filtered);
 }
 
 // --- updateSubjectBarStats ---
-function updateSubjectBarStats(filtered) {
+function updateSubjectStats(filtered) {
     const count = filtered.reduce((a, r) => (a[r.subject] = (a[r.subject] || 0) + 1, a), {});
     const container = document.getElementById('statsFach');
     if (!container) return;
@@ -1074,81 +1009,6 @@ function registerUpdateListener() {
     }
 }
 
-// === 3. DOMContentLoaded (jetzt sicher!) ===
-document.addEventListener('DOMContentLoaded', () => {
-    const version = targetVersion || new URL(location.href).searchParams.get('v') || '1.5.3.7';
-    const versionEl = document.getElementById('versionInfo');
-    if (versionEl) versionEl.textContent = `v${version} – © Matthias Kloß MPZ NB`;
-
-    updateSchoolButton();  // ← Jetzt definiert!
-    updateFilterStatus();  // ← Jetzt definiert!
-
-    if (!dropdownsInitialized && document.getElementById('filterSubject')) {
-        populateDropdowns();
-        applyFilters();
-        dropdownsInitialized = true;
-    }
-});
-
-// === 4. UPDATE-CHECK ===
-document.addEventListener('DOMContentLoaded', () => {
-    registerUpdateListener();
-    checkForAppUpdate();
-    window.addEventListener('focus', checkForAppUpdate);
-});
-
-    function updateSubjectBarStats(filtered) {
-        const count = filtered.reduce((a, r) => (a[r.subject] = (a[r.subject] || 0) + 1, a), {});
-        const container = document.getElementById('statsFach');
-        if (!container) return;
-        container.innerHTML = '';
-        const max = Math.max(...Object.values(count)) || 1;
-        Object.entries(count)
-            .sort((a, b) => b[1] - a[1])
-            .forEach(([k, v]) => {
-                const div = document.createElement('div');
-                div.className = 'stat-bar';
-                div.innerHTML = `
-                    <label>${k} <span class="bar-value">${v}</span></label>
-                    <div class="bar-container">
-                        <div class="bar" style="width:${(v / max * 100)}%"></div>
-                    </div>`;
-                container.appendChild(div);
-            });
-    }
-
-    // === EINMALIGE HILFSFUNKTION: Gefilterte Ressourcen zurückgeben ===
-function getFilteredResources() {
-    const f = {
-        subject: document.getElementById('filterSubject')?.value?.toLowerCase() || '',
-        grade: document.getElementById('filterGrade')?.value || '',
-        competence: document.getElementById('filterCompetence')?.value || '',
-        level: document.getElementById('filterLevel')?.value || '',
-        tool: document.getElementById('filterTool')?.value?.toLowerCase() || '',
-        favorite: document.getElementById('filterFavorite')?.value === 'true',
-        topic: document.getElementById('searchTopic')?.value?.toLowerCase().trim() || ''
-    };
-
-    return resources.filter(r => {
-        const topic = r.topic?.toLowerCase() || '';
-        const subject = r.subject?.toLowerCase() || '';
-        const grade = r.grade || '';
-        const competence = r.competence || '';
-        const level = r.level || '';
-        const tool = r.tool?.toLowerCase() || '';
-        const isFavorite = r.favorite || false;
-
-        if (f.subject && subject !== f.subject) return false;
-        if (f.grade && grade !== f.grade) return false;
-        if (f.competence && competence !== f.competence) return false;
-        if (f.level && level !== f.level) return false;
-        if (f.tool && tool !== f.tool) return false;
-        if (f.favorite && !isFavorite) return false;
-        if (f.topic && !topic.includes(f.topic)) return false;
-        return true;
-    });
-}
-
     // === FILTER & ANZEIGE ===
 function applyFilters() {
     const filtered = getFilteredResources();
@@ -1157,36 +1017,6 @@ function applyFilters() {
     updateFilterHighlight();
     updateFilterStatus();
 }
-// === FILTER-HIGHLIGHT: Färbe .filter-container bei aktivem Filter ===
-function updateFilterHighlight() {
-    const container = document.querySelector('.filter-container');
-    if (!container) return;
-    const selects = container.querySelectorAll('select');
-    const search = container.querySelector('#searchTopic');
-    const isActive = Array.from(selects).some(s => s.value && s.value !== '') ||
-                     (search && search.value.trim() !== '');
-    container.classList.toggle('active', isActive);
-}
-
-function updateFilterStatus() {
-    const isFiltered = getFilteredResources().length < resources.length;
-    const title = document.getElementById('filterExportTitle');
-    if (title) {
-        title.textContent = isFiltered ? 'Filter-Exporte (aktiv)' : 'Filter-Exporte';
-        title.style.color = isFiltered ? '#e74c3c' : 'var(--primary)';
-    }
-    document.querySelectorAll('.filtered-export').forEach(btn => {
-        btn.classList.toggle('active', isFiltered);
-    });
-}
-
-// Wird bei jedem Filterwechsel aufgerufen
-const originalApplyFilters = applyFilters;
-window.applyFilters = function() {
-    originalApplyFilters();
-    updateFilterHighlight();
-    updateFilterStatus();
-};
 
     function resetFilters() {
         ['filterSubject','filterGrade','filterCompetence','filterLevel','filterTool','filterFavorite'].forEach(id => {
@@ -1407,17 +1237,9 @@ function exportTemplate() {
 
     const csvBlob = new Blob(['\uFEFF' + template], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
+    link.href = URL.createObjectURL(csvBlob);
     link.download = 'Lerndashboard_Vorlage.csv';
     link.click();
-}
-
-function applyFilters() {
-    const filtered = getFilteredResources();
-    displayResources(filtered);
-    updateStats();                  // ← Statistiken mit gefilterten Daten
-    updateFilterHighlight();        // ← Filter-Container rot
-    updateFilterStatus();           // ← "Filter-Exporte (aktiv)" + Button-Puls
 }
 
 function exportCSV() {
@@ -1745,7 +1567,7 @@ const levelColors = {
     // Download
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
+    link.href = URL.createObjectURL(matrixBlob);
     link.download = `LernDashboard_Matrix_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     // Nach: link.click();
@@ -2070,27 +1892,12 @@ function exportMatrixExcel() {
     // === EXPORT MIT BESTÄTIGUNG ===
     workbook.xlsx.writeBuffer().then(buffer => {
         const excelBlob = new Blob([buffer], { type: 'application/octet-stream' });
-        saveAs(blob, `Kompetenzmatrix_${new Date().toISOString().slice(0,10)}.xlsx`);
+        saveAs(excelBlob, `Kompetenzmatrix_${new Date().toISOString().slice(0,10)}.xlsx`);
         showFancyAlert('Excel-Matrix erfolgreich erstellt!', 'success');
     }).catch(err => {
         console.error("Export-Fehler:", err);
         showFancyAlert('Export fehlgeschlagen!', 'error');
     });
-}
-// === Hilfsfunktion: Base64 → Blob ===
-function base64ToBlob(b64Data, contentType = '', sliceSize = 512) {
-    const byteCharacters = atob(b64Data);
-    const byteArrays = [];
-    for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
-        const slice = byteCharacters.slice(offset, offset + sliceSize);
-        const byteNumbers = new Array(slice.length);
-        for (let i = 0; i < slice.length; i++) {
-            byteNumbers[i] = slice.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        byteArrays.push(byteArray);
-    }
-    return new Blob(byteArrays, { type: contentType });
 }
 // === Hilfsfunktion: Base64 → Blob ===
 function base64ToBlob(b64Data, contentType = '', sliceSize = 512) {
@@ -2191,7 +1998,7 @@ function autoBackup() {
         ].join('\n');
 
         const csvBlob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
+        const url = URL.createObjectURL(csvBlob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `LernDashboard_Backup_${new Date().toISOString().slice(0,10)}.csv`;
@@ -2493,53 +2300,7 @@ function performImport(data) {
     populateDropdowns();
     applyFilters();
     updateStats();
-    updateSubjectStats();
-
-    // Erfolgs-Popup
-    showFancyAlert(
-        imported > 0
-            ? `${imported} Ressource${imported > 1 ? 'n' : ''} importiert!`
-            : 'Keine neuen Ressourcen importiert.',
-        imported > 0 ? 'success' : 'warning',
-        duplicates > 0 ? `${duplicates} Duplikat${duplicates > 1 ? 'e' : ''} übersprungen.` : ''
-    );
-}
-function performImport(data) {
-    let imported = 0;
-    let duplicates = 0;
-
-    data.forEach(entry => {
-        const thema = entry['Thema']?.trim();
-        const fach = entry['Unterrichtsfach'] || '';
-        const klasse = entry['Klassenstufe'] || '';
-        const tool = entry['Digitales_Hilfsmittel'] || '';
-
-        const exists = resources.some(r =>
-            r.topic === thema && r.subject === fach && r.grade === klasse && r.tool === tool
-        );
-
-        if (!exists && thema) {
-            resources.push({
-                topic: thema,
-                subject: fach,
-                grade: klasse,
-                competence: entry['Kompetenzbereich'] || '',
-                level: entry['Niveaustufe'] || '',
-                tool: tool,
-                description: entry['Beschreibung'] || '',
-                favorite: false
-            });
-            imported++;
-        } else if (thema) {
-            duplicates++;
-        }
-    });
-
-    localStorage.setItem('resources', JSON.stringify(resources));
-    populateDropdowns();
-    applyFilters();
-    updateStats();
-    updateSubjectStats();
+    updateToolFilter();
 
     // Erfolgs-Popup
     showFancyAlert(
@@ -2551,156 +2312,6 @@ function performImport(data) {
     );
 }
 
-// Eigentlicher Import mit Fortschritt
-function importWithProgress(csv, totalCount) {
-    const modal = document.createElement('div');
-    // ... (der Rest des Modal-HTML bleibt gleich, wie in deinem Code)
-
-    document.body.appendChild(modal);
-    requestAnimationFrame(() => {
-        modal.querySelector('div').style.transform = 'scale(1)';
-        modal.querySelector('div').style.opacity = '1';
-    });
-
-    const progressBar = modal.querySelector('#importProgress');
-    const circle = modal.querySelector('#progressCircle');
-    const title = modal.querySelector('#importTitle');
-    const subtitle = modal.querySelector('#importSubtitle');
-    const check = modal.querySelector('#checkMark');
-
-    setTimeout(() => {
-        try {
-            const rows = csv.split('\n').map(r => r.trim()).filter(r => r);
-            if (rows.length < 1) throw new Error('Keine gültigen Zeilen gefunden.');
-
-            const headers = parseCSVLine(rows[0]);
-            let imported = 0;
-            let duplicates = 0;
-
-            for (let i = 1; i < rows.length; i++) {
-                const values = parseCSVLine(rows[i]);
-                const entry = {};
-                headers.forEach((h, idx) => entry[h] = values[idx] || '');
-
-                const thema = entry['Thema']?.trim();
-                if (!thema) continue;
-
-                const fach = entry['Unterrichtsfach'] || '';
-                const klasse = entry['Klassenstufe'] || '';
-                const tool = entry['Digitales_Hilfsmittel'] || '';
-
-                const exists = resources.some(r =>
-                    r.topic === thema && r.subject === fach && r.grade === klasse && r.tool === tool
-                );
-
-                if (!exists) {
-                    resources.push({
-                        topic: thema,
-                        subject: fach,
-                        grade: klasse,
-                        competence: entry['Kompetenzbereich'] || '',
-                        level: entry['Niveaustufe'] || '',
-                        tool: tool,
-                        description: entry['Beschreibung'] || '',
-                        favorite: false
-                    });
-                    imported++;
-                } else {
-                    duplicates++;
-                }
-
-                // Realer Fortschritt
-                const percent = Math.round((i / (rows.length - 1)) * 100);
-                progressBar.style.width = `${percent}%`;
-                circle.style.strokeDashoffset = 276.46 * (1 - percent / 100);
-                subtitle.textContent = `${i} von ${rows.length - 1}`;
-            }
-
-            localStorage.setItem('resources', JSON.stringify(resources));
-            populateDropdowns();
-            applyFilters();
-            updateStats();
-            updateSubjectStats();
-
-            title.textContent = 'Import abgeschlossen!';
-            title.style.color = '#27ae60';
-            if (imported === 0) {
-                subtitle.textContent = `Keine neuen Ressourcen (Duplikate: ${duplicates})`;
-                check.style.stroke = '#f39c12';  // Gelb für Warnung
-            } else {
-                subtitle.textContent = `${imported} Ressourcen hinzugefügt (Duplikate: ${duplicates})`;
-            }
-            check.style.strokeDashoffset = '0';
-            check.style.animation = 'draw 0.6s ease forwards';
-
-        } catch (err) {
-            console.error('Import-Fehler:', err);
-            title.textContent = 'Import fehlgeschlagen!';
-            title.style.color = '#e74c3c';
-            subtitle.textContent = err.message || 'Unbekannter Fehler – prüfe CSV-Format.';
-        }
-
-        setTimeout(() => {
-            modal.style.opacity = '0';
-            setTimeout(() => modal.remove(), 400);
-        }, 2000);  // Länger anzeigen für Lesbarkeit
-    }, 300);
-}
-function updateSubjectStats() {
-    const filtered = getFilteredResources();
-    const count = filtered.reduce((a, r) => {
-        const subject = r.subject || 'Unbekannt';
-        a[subject] = (a[subject] || 0) + 1;
-        return a;
-    }, {});
-
-    const container = document.getElementById('statsFach');
-    if (!container) return;
-
-    container.innerHTML = '';
-    const max = Math.max(...Object.values(count), 1);
-
-    Object.entries(count)
-        .sort((a, b) => b[1] - a[1])
-        .forEach(([subject, value]) => {
-            const div = document.createElement('div');
-            div.className = 'stat-bar';
-            div.innerHTML = `
-                <label>${subject} <span class="bar-value">${value}</span></label>
-                <div class="bar-container">
-                    <div class="bar" style="width: ${(value / max * 100)}%"></div>
-                </div>
-            `;
-            container.appendChild(div);
-        });
-}
-// === HILFSFUNKTIONEN ===
-function parseCSVLine(line) {
-    const result = [];
-    let current = '';
-    let inQuotes = false;
-
-    for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        const nextChar = line[i + 1];
-
-        if (char === '"') {
-            if (inQuotes && nextChar === '"') {
-                current += '"';
-                i++;
-            } else {
-                inQuotes = !inQuotes;
-            }
-        } else if (char === ',' && !inQuotes) {
-            result.push(current);
-            current = '';
-        } else {
-            current += char;
-        }
-    }
-    result.push(current);
-    return result.map(s => s.trim().replace(/^"|"$/g, ''));
-}
 function showFancyAlert(title, type = 'info', subtitle = '') {
     // Entferne alte Modals (sicherheitshalber)
     document.querySelectorAll('[data-fancy-alert]').forEach(m => m.remove());
@@ -2814,7 +2425,7 @@ navigator.serviceWorker.addEventListener('message', event => {
 function showUpdateReady() {
   if (document.getElementById('updateBanner')) return;
 
-  const currentVersion = new URL(location.href).searchParams.get('v') || 'unbekannt';
+  const currentVersion = VERSION; // Direkt aus Konstante
   const newVersion = targetVersion || 'neu';
 
   const banner = document.createElement('div');
@@ -2832,23 +2443,28 @@ function showUpdateReady() {
       <button id="closeBanner" style="background: none; border: none; color: white; font-size: 20px; cursor: pointer; margin-left: 8px;">×</button>
     </div>
   `;
- 
+
   document.body.appendChild(banner);
 
-  // Installieren
+  // === INSTALLIEREN ===
   banner.querySelector('#installNow').onclick = () => {
-    if (!newWorker) return;
+    if (!newWorker) {
+      console.warn('Kein neuer Worker verfügbar');
+      return;
+    }
     banner.style.opacity = '0';
     banner.style.transition = 'opacity 0.3s ease';
+    setTimeout(() => banner.remove(), 300);
+
     newWorker.postMessage({ action: 'skipWaiting' });
   };
 
-  // Schließen
+  // === SCHLIESSEN ===
   banner.querySelector('#closeBanner').onclick = () => {
     banner.remove();
   };
 
-  // Auto-Schließen nach 15 Sekunden
+  // === AUTO-SCHLIESSEN ===
   setTimeout(() => {
     const b = document.getElementById('updateBanner');
     if (b) b.remove();
@@ -2868,12 +2484,13 @@ if (!document.getElementById('app-animations')) {
   document.head.appendChild(style);
 }
 
-
 // === SERVICE WORKER REGISTRIERUNG ===
+const swUrl = `service-worker.js?v=${VERSION}`;
+let deferredPrompt; // Für PWA-Install
+
 if ('serviceWorker' in navigator) {
-  const swUrl = `service-worker.js?v=${Date.now()}`; // Cache-Busting
   navigator.serviceWorker.register(swUrl).then(reg => {
-    console.log('SW registriert');
+    console.log('SW registriert mit Version:', VERSION);
 
     // Update gefunden?
     reg.addEventListener('updatefound', () => {
@@ -2889,7 +2506,10 @@ if ('serviceWorker' in navigator) {
     });
 
     // Sofort prüfen
-    reg.update();
+    reg.update().catch(err => console.error('Update-Prüfung fehlgeschlagen:', err));
+  }).catch(err => {
+    console.error('SW Registrierung fehlgeschlagen:', err);
+    showFancyAlert('Service Worker Fehler', 'warning', 'Updates könnten nicht funktionieren.');
   });
 
   // Bei Controller-Wechsel: Seite neu laden
@@ -2897,6 +2517,24 @@ if ('serviceWorker' in navigator) {
     window.location.reload();
   });
 }
+
+// PWA-Install-Prompt (zusätzlich zur Update-Logik)
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  // Optional: Zeige ein separates Banner für PWA-Installation
+  // showInstallBanner(); // Implementiere bei Bedarf
+});
+
+// Optional: Button für PWA-Install (füge in HTML hinzu, z.B. <button id="installPWA">App installieren</button>)
+document.getElementById('installPWA')?.addEventListener('click', async () => {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') console.log('PWA installiert');
+    deferredPrompt = null;
+  }
+});
 
  </script>  <!-- ← ENDE SCRIPT -->
 

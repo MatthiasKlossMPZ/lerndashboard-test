@@ -1,24 +1,23 @@
 // service-worker.js
-const REPO_PATH = 'https://matthiasklossmpz.github.io/lerndashboard-test/'; // ← Slash am Ende!
-const VERSION = new URL(self.location).searchParams.get('v') || '1.5.3.7';
+const REPO_PATH = 'https://matthiasklossmpz.github.io/lerndashboard-test/';
+const VERSION = '1.5.3.9';
 const CACHE_NAME = `lerndashboard-v${VERSION.replace(/\./g, '')}`;
 
 const urlsToCache = [
-  `${REPO_PATH}`,
-  `${REPO_PATH}index.html`,
-  `${REPO_PATH}new-resource.html`,
-  `${REPO_PATH}edit-resource.html`,
-  `${REPO_PATH}manifest.json`,
-  `${REPO_PATH}icon-192.png`,
-  `${REPO_PATH}icon-512.png`,
-  `${REPO_PATH}icon-maskable-192.png`,
-  `${REPO_PATH}icon-maskable-512.png`,
-  // Lokale Bibliotheken
-  `${REPO_PATH}libs/jspdf.umd.min.js`,
-  `${REPO_PATH}libs/jspdf.plugin.autotable.min.js`,
-  `${REPO_PATH}libs/jszip.min.js`,
-  `${REPO_PATH}libs/exceljs.min.js`,
-  `${REPO_PATH}libs/FileSaver.min.js`
+  `${REPO_PATH}?v=${VERSION}`,
+  `${REPO_PATH}index.html?v=${VERSION}`,
+  `${REPO_PATH}new-resource.html?v=${VERSION}`,
+  `${REPO_PATH}edit-resource.html?v=${VERSION}`,
+  `${REPO_PATH}manifest.json?v=${VERSION}`,
+  `${REPO_PATH}icon-192.png?v=${VERSION}`,
+  `${REPO_PATH}icon-512.png?v=${VERSION}`,
+  `${REPO_PATH}icon-maskable-192.png?v=${VERSION}`,
+  `${REPO_PATH}icon-maskable-512.png?v=${VERSION}`,
+  `${REPO_PATH}libs/jspdf.umd.min.js?v=${VERSION}`,
+  `${REPO_PATH}libs/jspdf.plugin.autotable.min.js?v=${VERSION}`,
+  `${REPO_PATH}libs/jszip.min.js?v=${VERSION}`,
+  `${REPO_PATH}libs/exceljs.min.js?v=${VERSION}`,
+  `${REPO_PATH}libs/FileSaver.min.js?v=${VERSION}`
 ];
 
 // === skipWaiting ===
@@ -36,11 +35,7 @@ self.addEventListener('install', event => {
       .then(cache => cache.addAll(urlsToCache))
       .then(() => {
         console.log(`SW v${VERSION} installiert`);
-        return self.clients.matchAll().then(clients => {
-          clients.forEach(client => {
-            client.postMessage({ type: 'NEW_VERSION', version: VERSION });
-          });
-        });
+        // KEIN postMessage hier!
       })
   );
 });
@@ -54,16 +49,22 @@ self.addEventListener('activate', event => {
       )
     ).then(() => {
       console.log(`SW v${VERSION} aktiviert`);
+      // Nur senden, wenn Controller existiert → Update!
+      if (navigator.serviceWorker.controller) {
+        return self.clients.matchAll().then(clients => {
+          clients.forEach(client => {
+            client.postMessage({ type: 'NEW_VERSION', version: VERSION });
+          });
+        });
+      }
       return self.clients.claim();
     })
   );
 });
 
-// === FETCH – nur eigene Dateien ===
+// === FETCH ===
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-
-  // Nur Anfragen aus unserem Repo
   if (url.href.startsWith(REPO_PATH)) {
     event.respondWith(
       caches.match(event.request).then(cached => {
