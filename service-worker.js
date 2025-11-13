@@ -1,6 +1,6 @@
 // service-worker.js
 const REPO_PATH = 'https://matthiasklossmpz.github.io/lerndashboard-test/';
-const VERSION = new URL(self.location).searchParams.get('v') || '1.5.3.3';
+const VERSION = new URL(self.location).searchParams.get('v') || '1.5.3.4';
 const CACHE_NAME = `lerndashboard-v${VERSION.replace(/\./g, '')}`;
 
 const urlsToCache = [
@@ -30,11 +30,23 @@ self.addEventListener('message', event => {
   }
 });
 
-// Install: Cache füllen
+// === INSTALL – VERSION AN CLIENT SENDEN ===
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
-      .then(() => console.log(`SW v${VERSION} installiert`))
+      .then(() => {
+        console.log(`SW v${VERSION} installiert`);
+        
+        // NEU: Sende neue Version an alle offenen Tabs
+        return self.clients.matchAll().then(clients => {
+          clients.forEach(client => {
+            client.postMessage({
+              type: 'NEW_VERSION',
+              version: VERSION
+            });
+          });
+        });
+      })
   );
 });
 

@@ -1104,7 +1104,7 @@ function registerUpdateListener() {
 
 // === 3. DOMContentLoaded (jetzt sicher!) ===
 document.addEventListener('DOMContentLoaded', () => {
-    const version = new URL(location.href).searchParams.get('v') || '1.5.3.3';
+    const version = targetVersion || new URL(location.href).searchParams.get('v') || '1.5.3.4';
     const versionEl = document.getElementById('versionInfo');
     if (versionEl) versionEl.textContent = `v${version} – © Matthias Kloß MPZ NB`;
 
@@ -2857,6 +2857,15 @@ window.addEventListener('load', () => {
 // === GLOBALE VARIABLEN ===
 let newWorker = null;
 
+let targetVersion = null;  // NEU: Ziel-Version speichern
+
+// NEU: Empfange Version vom Service-Worker
+navigator.serviceWorker.addEventListener('message', event => {
+  if (event.data?.type === 'NEW_VERSION') {
+    targetVersion = event.data.version;
+  }
+});
+
 // === EINZIGES UPDATE-BANNER ===
 function showUpdateReady() {
   if (document.getElementById('updateBanner')) return;
@@ -2870,7 +2879,7 @@ function showUpdateReady() {
       </svg>
       <div>
         <strong>Update verfügbar!</strong><br>
-        <span style="font-size: 13px;">Neue Version bereit</span>
+        ${currentVersion} → <strong>${newVersion}</strong>
       </div>
       <button id="installNow" style="background: white; color: #27ae60; border: none; border-radius: 10px; padding: 8px 16px; font-weight: 600; cursor: pointer;">Jetzt installieren</button>
       <button id="closeBanner" style="background: none; border: none; color: white; font-size: 20px; cursor: pointer; margin-left: 8px;">×</button>
