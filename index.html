@@ -1405,7 +1405,7 @@ function exportTemplate() {
         'Beispiel: Klimawandel,Geografie,Klasse 7,Analysieren und Reflektieren,Niveaustufe 3,Google Earth,"Beschreibung des Einsatzes..."'
     ].join('\n');
 
-    const blob = new Blob(['\uFEFF' + template], { type: 'text/csv;charset=utf-8;' });
+    const csvBlob = new Blob(['\uFEFF' + template], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = 'Lerndashboard_Vorlage.csv';
@@ -1439,7 +1439,7 @@ function exportCSV() {
     ].join(',')).join('\n');
 
     const fullCsv = `${COLUMNS.join(',')}\n${csvContent}`;
-    const blob = new Blob(['\uFEFF' + fullCsv], { type: 'text/csv;charset=utf-8;' });
+    const csvBlob = new Blob(['\uFEFF' + fullCsv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `LernDashboard_${new Date().toISOString().slice(0, 10)}.csv`;
