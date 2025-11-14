@@ -823,7 +823,7 @@
 
 <script>
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-const VERSION = '1.5.3.36';
+const VERSION = '1.5.3.38';
 const REPO_PATH = (
   location.hostname === 'localhost' ||
   location.hostname === '127.0.0.1' ||
@@ -1101,7 +1101,7 @@ let newWorker;
 
 function showUpdateUI() {
   const existing = document.getElementById('updateBanner');
-  if (existing) existing.remove();
+  if (existing) return; // Verhindert doppeltes Anzeigen
 
   const banner = document.createElement('div');
   banner.id = 'updateBanner';
@@ -1121,21 +1121,22 @@ function showUpdateUI() {
       padding: 10px 20px; border-radius: 10px;
       font-weight: bold; cursor: pointer; font-size: 15px;
     ">Jetzt aktualisieren</button>
+    <button id="closeBanner" style="
+      background:none; border:none; color:white; font-size:20px; cursor:pointer; margin-left:8px;
+    ">×</button>
   `;
 
   document.body.appendChild(banner);
 
-  // WICHTIG: Reload erst NACH Klick + SKIP_WAITING
+  // Klick → SKIP_WAITING → Reload
   document.getElementById('updateNowBtn').onclick = () => {
     if (navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
     }
-    // Warte kurz, dann reload
-    setTimeout(() => {
-      window.location.reload();
-    }, 100);
-    banner.remove();
+    setTimeout(() => window.location.reload(), 100);
   };
+
+  document.getElementById('closeBanner').onclick = () => banner.remove();
 }
 
 // === SERVICE WORKER REGISTRIERUNG ===
@@ -1144,27 +1145,32 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
       .then(reg => {
         console.log('SW registriert:', reg.scope);
-        reg.update();
+        reg.update(); // Sofort nach Update suchen
 
-        // UPDATE-LOGIK
-        let updateBannerShown = false;
-        let newWorker;
+        // === UPDATE-LOGIK HIER ===
+        let updateReady = false;
 
         reg.addEventListener('updatefound', () => {
-        const newWorker = reg.installing;
-        if (!newWorker) return;
+          const newWorker = reg.installing;
+          if (!newWorker) return;
 
-        newWorker.addEventListener('statechange', () => {
-        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-      showUpdateUI(); // Banner anzeigen
-             }
+          newWorker.addEventListener('statechange', () => {
+            if (
+              newWorker.state === 'installed' &&
+              navigator.serviceWorker.controller &&
+              !updateReady
+            ) {
+              updateReady = true;
+              showUpdateUI(); // Banner erscheint und bleibt!
+            }
+          });
         });
-    });
+        // =========================
       })
       .catch(err => console.error('SW Fehler:', err));
   });
 
-  // Version anzeigen
+  // === VERSION ANZEIGEN ===
   navigator.serviceWorker.addEventListener('message', event => {
     if (event.data?.type === 'NEW_VERSION') {
       const info = document.getElementById('versionInfo');
@@ -1172,12 +1178,11 @@ if ('serviceWorker' in navigator) {
     }
   });
 
-  // Nach Update fuer Debug
+  // === RELOAD NACH SKIP_WAITING ===
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-  console.log('Neuer Service Worker übernimmt Kontrolle');
-  // KEIN reload() hier!
-});
-
+    console.log('Neuer SW übernimmt – Seite wird neu geladen');
+    setTimeout(() => window.location.reload(), 100);
+  });
 }
 
 // === PWA INSTALLATION ===
