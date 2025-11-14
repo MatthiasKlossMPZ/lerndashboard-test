@@ -1,5 +1,5 @@
 // service-worker.js
-const VERSION = '1.5.3.73';  // Erhöhe bei jedem Update!
+const VERSION = '1.5.3.80';  // Erhöhe bei jedem Update!
 const CACHE_NAME = `lerndashboard-v${VERSION.replace(/\./g, '')}`;
 const REPO_PATH = 'https://matthiasklossmpz.github.io/lerndashboard-test/';
 
@@ -29,20 +29,26 @@ self.addEventListener('message', event => {
 });
 
 // === INSTALL === (DEIN BLOCK IST PERFEKT!)
+// @ts-nocheck  
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return Promise.allSettled(
-        urlsToCache.map(url =>
-          fetch(url, { cache: 'reload' })
-            .then(r => { if (r.ok) return cache.put(url, r); })
-            .catch(() => {})
-        )
-      );
-    }).then(() => {
-      console.log(`SW v${VERSION} installiert`);
-      return self.skipWaiting(); // SOFORT AKTIVIEREN!
-    })
+    caches.open(CACHE_NAME)
+      .then(cache => {
+        // Hier: return erforderlich!
+        return Promise.allSettled(
+          urlsToCache.map(url =>
+            fetch(url, { cache: 'reload' })
+              .then(r => {
+                if (r.ok) return cache.put(url, r);
+              })
+              .catch(() => {})
+          )
+        );
+      })
+      .then(() => {
+        console.log(`SW v${VERSION} installiert`);
+        // KEIN skipWaiting() hier → Benutzer muss klicken!
+      })
   );
 });
 

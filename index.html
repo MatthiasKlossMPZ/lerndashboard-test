@@ -823,7 +823,7 @@
 
 <script>
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-const VERSION = '1.5.3.73';
+const VERSION = '1.5.3.80';
 const REPO_PATH = (
   location.hostname === 'localhost' ||
   location.hostname === '127.0.0.1' ||
@@ -1165,7 +1165,6 @@ function showPWAInstallBanner() {
     banner.style.display = 'flex';
     return;
   }
-
   banner = document.createElement('div');
   banner.id = 'pwaInstallBanner';
   banner.style.cssText = `
@@ -1182,7 +1181,6 @@ function showPWAInstallBanner() {
     <button id="installPwaBtn" style="background:white; color:#6b46c1; border:none; border-radius:8px; padding:4px 12px; margin-left:8px; font-weight:600; cursor:pointer;">Installieren</button>
     <button id="closePwaBanner" style="background:none; border:none; color:white; font-size:18px; margin-left:8px; cursor:pointer;">×</button>
   `;
-
   document.body.appendChild(banner);
 
   document.getElementById('installPwaBtn').onclick = async () => {
@@ -1198,13 +1196,12 @@ function showPWAInstallBanner() {
     banner.style.display = 'none';
     deferredPrompt = null;
   };
+}  
 
-// === PWA UPDATE LOGIK ===
-
+// === PWA UPDATE BANNER ===
 function showUpdateBanner() {
   if (updateBannerShown || document.getElementById('updateBanner')) return;
   updateBannerShown = true;
-
   const banner = document.createElement('div');
   banner.id = 'updateBanner';
   banner.style.cssText = `
@@ -1217,7 +1214,6 @@ function showUpdateBanner() {
     padding-top: calc(18px + env(safe-area-inset-top, 0px));
     padding-bottom: max(18px, env(safe-area-inset-bottom, 18px));
   `;
-
   banner.innerHTML = `
     <div style="font-weight: 700; font-size: 16px;">Neue Version verfügbar!</div>
     <button id="updateNowBtn" style="
@@ -1226,29 +1222,19 @@ function showUpdateBanner() {
       min-width: 160px; box-shadow: 0 3px 10px rgba(0,0,0,0.2);
     ">Jetzt aktualisieren</button>
   `;
-
   document.body.appendChild(banner);
   requestAnimationFrame(() => {
     banner.style.transform = 'translateY(0)';
   });
 
-  document.getElementById('updateNowBtn').onclick = () => {
-  allowReload = true;  // Erlaube Reload
-
-  if (navigator.serviceWorker.controller) {
-    navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
-  }
-
-  banner.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
-  banner.style.transform = 'translateY(-100%)';
-  banner.style.opacity = '0';
-  setTimeout(() => {
-    banner.remove();
-    // KEIN window.location.reload() hier!
-  }, 400);
+  // showUpdateBanner() → Button
+document.getElementById('updateNowBtn').onclick = () => {
+  allowReload = true;
+  newServiceWorker.postMessage({ type: 'SKIP_WAITING' });
+  // Banner ausblenden + reload
 };
-}
-}
+}  
+
 // === SERVICE WORKER REGISTRIERUNG ===
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -1256,56 +1242,49 @@ if ('serviceWorker' in navigator) {
       .then(reg => {
         console.log('SW registriert:', reg.scope);
 
-        // Hilfsfunktion: Überwacht neuen Worker
         function trackInstalling(worker) {
           newServiceWorker = worker;
-          console.log('trackInstalling: Worker wird überwacht', worker.state);
 
-          worker.addEventListener('statechange', () => {
-            console.log('Worker state:', worker.state);
+          worker.onstatechange = () => {
+            console.log('SW state:', worker.state);
             if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-              console.log('NEUER SW INSTALLIERT → BANNER ZEIGEN!');
               showUpdateBanner();
             }
-          });
+          };
         }
 
-        // 1. Prüfe wartenden Worker
+        // 1. Wartender Worker?
         if (reg.waiting) {
           newServiceWorker = reg.waiting;
           showUpdateBanner();
           return;
         }
 
-        // 2. Prüfe laufende Installation
+        // 2. Laufende Installation?
         if (reg.installing) {
           trackInstalling(reg.installing);
         }
 
-        // 3. Prüfe zukünftige Updates
+        // 3. Zukünftige Updates
         reg.addEventListener('updatefound', () => {
           const newWorker = reg.installing;
-          if (newWorker) {
-            trackInstalling(newWorker);
-          }
+          if (newWorker) trackInstalling(newWorker);
         });
 
-        // 4. Update-Suche starten
+        // 4. Update suchen
         reg.update();
       })
       .catch(err => console.error('SW Fehler:', err));
   });
 }
 
-// === RELOAD NUR NACH KICK ===
+// === NUR NACH KICK RELOAD ===
 navigator.serviceWorker.addEventListener('controllerchange', () => {
   if (allowReload) {
     window.location.reload();
   }
 });
   
-
-
 // === PWA INSTALLATION ===
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
