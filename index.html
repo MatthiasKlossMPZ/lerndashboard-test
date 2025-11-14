@@ -823,7 +823,7 @@
 
 <script>
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-const VERSION = '1.5.3.40';
+const VERSION = '1.5.3.41';
 const REPO_PATH = (
   location.hostname === 'localhost' ||
   location.hostname === '127.0.0.1' ||
@@ -1208,43 +1208,67 @@ function showPWAInstallBanner() {
 let newWorker;
 
 function showUpdateUI() {
-  const existing = document.getElementById('updateBanner');
-  if (existing) return; // Verhindert doppeltes Anzeigen
+  // Verhindere doppeltes Anzeigen
+  if (document.getElementById('updateBanner')) return;
 
   const banner = document.createElement('div');
   banner.id = 'updateBanner';
   banner.style.cssText = `
-    position: fixed; bottom: 0; left: 0; right: 0;
-    background: #6b46c1; color: white; padding: 1rem;
-    text-align: center; z-index: 9999; font-family: sans-serif;
-    box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
-    display: flex; justify-content: center; align-items: center; gap: 12px;
-    animation: slideUp 0.5s ease;
+    position: fixed;
+    top: env(safe-area-inset-top, 0px); /* Sicherer Abstand zur Notch */
+    left: 0; right: 0;
+    background: #6b46c1;
+    color: white;
+    padding: 16px 20px;
+    text-align: center;
+    z-index: 9999;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    animation: slideDown 0.5s ease;
+    transform: translateY(-100%);
   `;
 
   banner.innerHTML = `
-    <span>Neue Version verfügbar!</span>
-    <button id="updateNowBtn" style="
-      background: white; color: #6b46c1; border: none;
-      padding: 10px 20px; border-radius: 10px;
-      font-weight: bold; cursor: pointer; font-size: 15px;
-    ">Jetzt aktualisieren</button>
-    <button id="closeBanner" style="
-      background:none; border:none; color:white; font-size:20px; cursor:pointer; margin-left:8px;
-    ">×</button>
+    <div style="font-weight: 600; font-size: 16px;">
+      Neue Version verfügbar!
+    </div>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+      <button id="updateNowBtn" style="
+        background: white; color: #6b46c1; border: none;
+        padding: 10px 24px; border-radius: 12px;
+        font-weight: 700; cursor: pointer; font-size: 15px;
+        min-width: 140px;
+      ">Jetzt aktualisieren</button>
+    </div>
   `;
 
+  // Animation: Einblenden
   document.body.appendChild(banner);
+  requestAnimationFrame(() => {
+    banner.style.transform = 'translateY(0)';
+  });
 
-  // Klick → SKIP_WAITING → Reload
+  // === NUR Aktualisieren schließt das Banner ===
   document.getElementById('updateNowBtn').onclick = () => {
     if (navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
     }
-    setTimeout(() => window.location.reload(), 100);
+    // Banner ausblenden
+    banner.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
+    banner.style.transform = 'translateY(-100%)';
+    banner.style.opacity = '0';
+    setTimeout(() => {
+      if (banner.parentNode) banner.remove();
+      window.location.reload();
+    }, 400);
   };
 
-  document.getElementById('closeBanner').onclick = () => banner.remove();
+  // === KEIN Schließen per × mehr! ===
+  // → Banner bleibt, bis aktualisiert wird
 }
 
 // === SERVICE WORKER REGISTRIERUNG ===
@@ -2821,6 +2845,19 @@ tr:last-child td {
     justify-content: center;
     margin: 6px 0 12px !important;   /* Kleiner Abstand oben/unten – einheitlich */
     width: 100%;
+}
+
+/* PWA Mobile: Banner immer sichtbar, auch in App-Modus */
+#updateBanner {
+  padding-top: calc(16px + env(safe-area-inset-top, 0px)) !important;
+  padding-bottom: env(safe-area-inset-bottom, 16px) !important;
+}
+
+/* Fallback für Android/iOS ohne safe-area */
+@supports not (padding-top: env(safe-area-inset-top)) {
+  #updateBanner {
+    padding-top: 32px !important;
+  }
 }
     </style>
 <!-- === BEARBEITUNGS-BESTÄTIGUNG (ANIMATION – OHNE TON) === -->
