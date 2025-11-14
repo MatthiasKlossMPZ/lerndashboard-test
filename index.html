@@ -1100,7 +1100,6 @@ function showPWAInstallBanner() {
 let newWorker;
 
 function showUpdateUI() {
-  // Verhindere doppeltes Banner
   if (document.getElementById('updateBanner')) return;
 
   const banner = document.createElement('div');
@@ -1111,6 +1110,7 @@ function showUpdateUI() {
     text-align: center; z-index: 9999; font-family: sans-serif;
     box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
     display: flex; justify-content: center; align-items: center; gap: 12px;
+    cursor: default; /* Kein Hover-Effekt */
   `;
 
   const text = document.createElement('span');
@@ -1121,57 +1121,37 @@ function showUpdateUI() {
   button.textContent = 'Jetzt aktualisieren';
   button.style.cssText = `
     background: white; color: #6b46c1; border: none;
-    padding: 8px 16px; border-radius: 8px;
-    font-weight: bold; cursor: pointer; font-size: 14px;
+    padding: 10px 20px; border-radius: 10px;
+    font-weight: bold; cursor: pointer; font-size: 15px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    transition: all 0.2s ease;
   `;
 
-  // KLICK DIREKT SETZEN
+  // HOVER-EFFEKT NUR AUF BUTTON
+  button.onmouseover = () => {
+    button.style.transform = 'translateY(-2px)';
+    button.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+  };
+  button.onmouseout = () => {
+    button.style.transform = 'translateY(0)';
+    button.style.boxShadow = '0 2px 6px rgba(0,0,0,0.2)';
+  };
+
+  // KLICK → UPDATE + BANNER WEG
   button.onclick = () => {
     if (navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
     }
-    banner.remove(); // Banner sofort weg!
+    banner.remove();
   };
 
   banner.appendChild(text);
   banner.appendChild(button);
   document.body.appendChild(banner);
-}
 
-// === SERVICE WORKER REGISTRIERUNG ===
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
-      .then(reg => {
-        console.log('SW registriert:', reg.scope);
-        reg.update();
-
-        reg.addEventListener('updatefound', () => {
-          newWorker = reg.installing;
-          if (!newWorker) return;
-
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              showUpdateUI(); // POPUP!
-            }
-          });
-        });
-      })
-      .catch(err => console.error('SW Fehler:', err));
-  });
-
-  // Version anzeigen
-  navigator.serviceWorker.addEventListener('message', event => {
-    if (event.data?.type === 'NEW_VERSION') {
-      const info = document.getElementById('versionInfo');
-      if (info) info.textContent = `v${event.data.version}`;
-    }
-  });
-
-  // Nach Update neu laden
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    window.location.reload();
-  });
+  // VERHINDERE, DASS BANNER VERSCHWINDET
+  banner.onmouseover = (e) => e.stopPropagation();
+  banner.onmousemove = (e) => e.stopPropagation();
 }
 
 // === PWA INSTALLATION ===
