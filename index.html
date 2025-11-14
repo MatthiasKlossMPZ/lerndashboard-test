@@ -823,7 +823,7 @@
 
 <script>
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-const VERSION = '1.5.3.38';
+const VERSION = '1.5.3.40';
 const REPO_PATH = (
   location.hostname === 'localhost' ||
   location.hostname === '127.0.0.1' ||
@@ -839,7 +839,7 @@ let targetVersion = null;
 
 // === DROPDOWN-DATEN ===
 const subjects = ['Deutsch','Mathematik','Englisch','Biologie','Chemie','Physik','Geschichte','Geografie','Politik','Wirtschaft','Informatik','Kunst','Musik','Sport','Ethik','Religion'];
-const grades = ['Klasse 5','Klasse 6','Klasse 7','Klasse 8','Klasse 9','Klasse 10','Klasse 11','Klasse 12','Klasse 13'];
+const grades = ['Klasse 1','Klasse 2','Klasse 3','Klasse 4','Klasse 5','Klasse 6','Klasse 7','Klasse 8','Klasse 9','Klasse 10','Klasse 11','Klasse 12','Klasse 13'];
 const competences = [
   'Suchen, Verarbeiten und Aufbewahren',
   'Kommunizieren und Kooperieren',
@@ -874,20 +874,126 @@ function updateSchoolButton() {
     }
 }
 
+
+// === SCHULNAME MODAL (MODERNES DESIGN) ===
 function setSchoolName() {
-    const current = getSchoolName();
-    const name = prompt('Schulname eingeben:', current || '');
-    if (name !== null) {
-        const trimmed = name.trim();
-        if (trimmed) {
-            localStorage.setItem('schoolName', trimmed);
+    const current = getSchoolName() || '';
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5); backdrop-filter: blur(8px);
+        display: flex; justify-content: center; align-items: center;
+        z-index: 20000; padding: 20px; box-sizing: border-box;
+        animation: fadeIn 0.3s ease;
+    `;
+
+    modal.innerHTML = `
+        <div style="
+            background: var(--card); padding: 28px; border-radius: 16px;
+            width: 100%; max-width: 420px; box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+            transform: scale(0.9); opacity: 0;
+            animation: modalPop 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards;
+        ">
+            <h3 style="
+                margin: 0 0 16px; font-size: 18px; font-weight: 700; color: var(--text);
+                text-align: center;
+            ">Schulname eingeben</h3>
+            <p style="
+                margin: 0 0 16px; font-size: 14px; color: var(--text-light); text-align: center;
+            ">Wird in Exports und Druckansicht angezeigt.</p>
+            <input type="text" id="schoolNameInput" value="${current}"
+                placeholder="z.B. Grundschule Campus"
+                style="
+                    width: 100%; padding: 12px 14px; border: 1px solid #ccc; border-radius: 10px;
+                    font-size: 15px; margin-bottom: 20px; box-sizing: border-box;
+                    transition: border 0.2s, box-shadow 0.2s;
+                "
+                onfocus="this.style.borderColor='var(--primary)'; this.style.boxShadow='0 0 0 3px rgba(107,70,193,0.15)'"
+                onblur="this.style.borderColor='#ccc'; this.style.boxShadow='none'"
+            />
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button id="cancelSchoolBtn" style="
+                    padding: 10px 18px; background: #95a5a6; color: white; border: none;
+                    border-radius: 10px; font-weight: 600; cursor: pointer; min-width: 90px;
+                    transition: all 0.2s;
+                " onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+                    Abbrechen
+                </button>
+                <button id="saveSchoolBtn" style="
+                    padding: 10px 18px; background: var(--primary); color: white; border: none;
+                    border-radius: 10px; font-weight: 600; cursor: pointer; min-width: 90px;
+                    position: relative; overflow: hidden; box-shadow: 0 6px 16px rgba(107,70,193,0.3);
+                    transition: all 0.3s ease;
+                " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 10px 24px rgba(107,70,193,0.4)'"
+                onmouseout="this.style.transform=''; this.style.boxShadow='0 6px 16px rgba(107,70,193,0.3)'">
+                    Speichern
+                    <span style="
+                        content: ''; position: absolute; top: 0; left: -100%;
+                        width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+                        transition: left 0.7s;
+                    "></span>
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Animation einblenden
+    requestAnimationFrame(() => {
+        modal.querySelector('div').style.transform = 'scale(1)';
+        modal.querySelector('div').style.opacity = '1';
+    });
+
+    // Fokus
+    const input = modal.querySelector('#schoolNameInput');
+    setTimeout(() => input.focus(), 100);
+
+    // Buttons
+    modal.querySelector('#cancelSchoolBtn').onclick = () => {
+        modal.style.opacity = '0';
+        setTimeout(() => modal.remove(), 300);
+    };
+
+    modal.querySelector('#saveSchoolBtn').onclick = () => {
+        const name = input.value.trim();
+        if (name) {
+            localStorage.setItem('schoolName', name);
         } else {
             localStorage.removeItem('schoolName');
         }
         updateSchoolButton();
         document.getElementById('printSchoolNameText').textContent = getSchoolName() || 'Deine Schule';
-    }
+
+        // Shine-Effekt beim Speichern
+        const shine = modal.querySelector('#saveSchoolBtn span');
+        shine.style.left = '100%';
+        setTimeout(() => {
+            modal.style.opacity = '0';
+            setTimeout(() => modal.remove(), 300);
+        }, 400);
+    };
+
+    // ESC-Taste
+    const closeOnEsc = (e) => {
+        if (e.key === 'Escape') {
+            modal.querySelector('#cancelSchoolBtn').click();
+            document.removeEventListener('keydown', closeOnEsc);
+        }
+    };
+    document.addEventListener('keydown', closeOnEsc);
 }
+
+// === ANIMATIONEN ===
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes modalPop {
+        from { transform: scale(0.9); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+`;
+document.head.appendChild(style);
 
 function setFilterAndApply(filterId, value) {
     const select = document.getElementById(filterId);
@@ -1021,10 +1127,12 @@ function resetFilters() {
     applyFilters();
 }
 
-// === VERSION ANZEIGEN ===
+// === COPYRIGHT + VERSION ANZEIGEN ===
 window.addEventListener('load', () => {
-  const el = document.getElementById('versionInfo');
-  if (el) el.textContent = `Version ${VERSION}`;
+    const el = document.getElementById('versionInfo');
+    if (el) {
+        el.innerHTML = `© 2025 <strong>Matthias Kloß</strong> | Version ${VERSION}`;
+    }
 });
 
 // === EMPFANGE ÄNDERUNGEN AUS EDIT-POPUP ===
