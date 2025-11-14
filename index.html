@@ -824,7 +824,7 @@
 <script>
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
 let updateBannerShown = false;
-const VERSION = '1.5.3.50';
+const VERSION = '1.5.3.52';
 const REPO_PATH = (
   location.hostname === 'localhost' ||
   location.hostname === '127.0.0.1' ||
@@ -1265,7 +1265,7 @@ if ('serviceWorker' in navigator) {
 
   newWorker.addEventListener('statechange', () => {
     if (newWorker.state === 'installed') {
-      showUpdateBanner(); // ← Egal ob controller vorhanden oder nicht!
+      showUpdateBanner(); // ← RICHTIGER FUNKTION!
     }
   });
 });
