@@ -1100,6 +1100,7 @@ function showPWAInstallBanner() {
 let newWorker;
 
 function showUpdateUI() {
+  // Verhindere doppeltes Banner
   if (document.getElementById('updateBanner')) return;
 
   const banner = document.createElement('div');
@@ -1109,23 +1110,32 @@ function showUpdateUI() {
     background: #6b46c1; color: white; padding: 1rem;
     text-align: center; z-index: 9999; font-family: sans-serif;
     box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
-  `;
-  banner.innerHTML = `
-    Neue Version verfügbar!
-    <button id="updateBtn" style="
-      background: white; color: #6b46c1; border: none;
-      margin-left: 10px; padding: 6px 12px; border-radius: 6px;
-      font-weight: bold; cursor: pointer;
-    ">Jetzt aktualisieren</button>
+    display: flex; justify-content: center; align-items: center; gap: 12px;
   `;
 
-  document.body.appendChild(banner);
+  const text = document.createElement('span');
+  text.textContent = 'Neue Version verfügbar!';
 
-  document.getElementById('updateBtn').onclick = () => {
+  const button = document.createElement('button');
+  button.id = 'updateBtn';
+  button.textContent = 'Jetzt aktualisieren';
+  button.style.cssText = `
+    background: white; color: #6b46c1; border: none;
+    padding: 8px 16px; border-radius: 8px;
+    font-weight: bold; cursor: pointer; font-size: 14px;
+  `;
+
+  // KLICK DIREKT SETZEN
+  button.onclick = () => {
     if (navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
     }
+    banner.remove(); // Banner sofort weg!
   };
+
+  banner.appendChild(text);
+  banner.appendChild(button);
+  document.body.appendChild(banner);
 }
 
 // === SERVICE WORKER REGISTRIERUNG ===
