@@ -1,5 +1,5 @@
 // service-worker.js
-const VERSION = '1.5.3.52';  // Erhöhe bei jedem Update!
+const VERSION = '1.5.3.73';  // Erhöhe bei jedem Update!
 const CACHE_NAME = `lerndashboard-v${VERSION.replace(/\./g, '')}`;
 const REPO_PATH = 'https://matthiasklossmpz.github.io/lerndashboard-test/';
 

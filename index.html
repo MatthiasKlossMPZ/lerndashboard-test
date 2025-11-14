@@ -823,8 +823,7 @@
 
 <script>
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-let updateBannerShown = false;
-const VERSION = '1.5.3.52';
+const VERSION = '1.5.3.73';
 const REPO_PATH = (
   location.hostname === 'localhost' ||
   location.hostname === '127.0.0.1' ||
@@ -837,6 +836,9 @@ let dropdownsInitialized = false;
 
 let deferredPrompt = null;
 let targetVersion = null;
+let allowReload = false;          
+let newServiceWorker = null;
+let updateBannerShown = false;
 
 // === DROPDOWN-DATEN ===
 const subjects = ['Deutsch','Mathematik','Englisch','Biologie','Chemie','Physik','Geschichte','Geografie','Politik','Wirtschaft','Informatik','Kunst','Musik','Sport','Ethik','Religion'];
@@ -1198,22 +1200,19 @@ function showPWAInstallBanner() {
   };
 
 // === PWA UPDATE LOGIK ===
-let newWorker;
 
 function showUpdateBanner() {
-  // VERHINDERE DOPPELTE ANZEIGE
   if (updateBannerShown || document.getElementById('updateBanner')) return;
-  updateBannerShown = true; // ← WICHTIG!
+  updateBannerShown = true;
 
   const banner = document.createElement('div');
   banner.id = 'updateBanner';
   banner.style.cssText = `
-    position: fixed; top: 0; left: 0; right: 0;
-    background: linear-gradient(135deg, #6b46c1, #8e67d6);
-    color: white; padding: 18px 20px; text-align: center;
-    z-index: 999999; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.25); display: flex; flex-direction: column;
-    gap: 10px; align-items: center; animation: slideInDown 0.5s ease forwards;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 999999;
+    background: linear-gradient(135deg, #6b46c1, #8e67d6); color: white;
+    padding: 18px 20px; text-align: center; font-family: system-ui, sans-serif;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3); display: flex; flex-direction: column;
+    gap: 12px; align-items: center; animation: slideInDown 0.5s ease forwards;
     transform: translateY(-100%);
     padding-top: calc(18px + env(safe-area-inset-top, 0px));
     padding-bottom: max(18px, env(safe-area-inset-bottom, 18px));
@@ -1221,66 +1220,91 @@ function showUpdateBanner() {
 
   banner.innerHTML = `
     <div style="font-weight: 700; font-size: 16px;">Neue Version verfügbar!</div>
-    <div style="font-size: 14px; opacity: 0.9; max-width: 90%;">
-      Tippe auf „Aktualisieren“, um die neuesten Funktionen zu erhalten.
-    </div>
     <button id="updateNowBtn" style="
       background: white; color: #6b46c1; border: none; padding: 12px 32px;
       border-radius: 14px; font-weight: 700; font-size: 15px; cursor: pointer;
       min-width: 160px; box-shadow: 0 3px 10px rgba(0,0,0,0.2);
-    ">Aktualisieren</button>
+    ">Jetzt aktualisieren</button>
   `;
 
   document.body.appendChild(banner);
-  requestAnimationFrame(() => banner.style.transform = 'translateY(0)');
+  requestAnimationFrame(() => {
+    banner.style.transform = 'translateY(0)';
+  });
 
   document.getElementById('updateNowBtn').onclick = () => {
-    if (navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
-    }
-    banner.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
-    banner.style.transform = 'translateY(-100%)';
-    banner.style.opacity = '0';
-    setTimeout(() => {
-      banner.remove();
-      window.location.reload();
-    }, 400);
-  };
-}
+  allowReload = true;  // Erlaube Reload
 
+  if (navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
+  }
+
+  banner.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
+  banner.style.transform = 'translateY(-100%)';
+  banner.style.opacity = '0';
+  setTimeout(() => {
+    banner.remove();
+    // KEIN window.location.reload() hier!
+  }, 400);
+};
+}
+}
 // === SERVICE WORKER REGISTRIERUNG ===
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
       .then(reg => {
         console.log('SW registriert:', reg.scope);
-        reg.update(); // Sofort nach Update suchen
 
-        // === UPDATE-LOGIK HIER ===
-        let updateReady = false;
+        // Hilfsfunktion: Überwacht neuen Worker
+        function trackInstalling(worker) {
+          newServiceWorker = worker;
+          console.log('trackInstalling: Worker wird überwacht', worker.state);
 
-       reg.addEventListener('updatefound', () => {
-  const newWorker = reg.installing;
-  if (!newWorker) return;
+          worker.addEventListener('statechange', () => {
+            console.log('Worker state:', worker.state);
+            if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+              console.log('NEUER SW INSTALLIERT → BANNER ZEIGEN!');
+              showUpdateBanner();
+            }
+          });
+        }
 
-  newWorker.addEventListener('statechange', () => {
-    if (newWorker.state === 'installed') {
-      showUpdateBanner(); // ← RICHTIGER FUNKTION!
-    }
-  });
-});
-        // =========================
+        // 1. Prüfe wartenden Worker
+        if (reg.waiting) {
+          newServiceWorker = reg.waiting;
+          showUpdateBanner();
+          return;
+        }
+
+        // 2. Prüfe laufende Installation
+        if (reg.installing) {
+          trackInstalling(reg.installing);
+        }
+
+        // 3. Prüfe zukünftige Updates
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            trackInstalling(newWorker);
+          }
+        });
+
+        // 4. Update-Suche starten
+        reg.update();
       })
       .catch(err => console.error('SW Fehler:', err));
   });
+}
 
-  // === RELOAD NACH SKIP_WAITING ===
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    console.log('Neuer SW übernimmt – Seite wird neu geladen');
-    setTimeout(() => window.location.reload(), 100);
-  });
-}
-}
+// === RELOAD NUR NACH KICK ===
+navigator.serviceWorker.addEventListener('controllerchange', () => {
+  if (allowReload) {
+    window.location.reload();
+  }
+});
+  
+
 
 // === PWA INSTALLATION ===
 window.addEventListener('beforeinstallprompt', (e) => {
