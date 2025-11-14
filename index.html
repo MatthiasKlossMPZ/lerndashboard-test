@@ -823,7 +823,7 @@
 
 <script>
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-const VERSION = '1.5.3.35';
+const VERSION = '1.5.3.36';
 const REPO_PATH = (
   location.hostname === 'localhost' ||
   location.hostname === '127.0.0.1' ||
@@ -1100,7 +1100,6 @@ function showPWAInstallBanner() {
 let newWorker;
 
 function showUpdateUI() {
-  // Entferne alten Banner, falls vorhanden
   const existing = document.getElementById('updateBanner');
   if (existing) existing.remove();
 
@@ -1121,17 +1120,20 @@ function showUpdateUI() {
       background: white; color: #6b46c1; border: none;
       padding: 10px 20px; border-radius: 10px;
       font-weight: bold; cursor: pointer; font-size: 15px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
     ">Jetzt aktualisieren</button>
   `;
 
   document.body.appendChild(banner);
 
-  // Button-Handler
+  // WICHTIG: Reload erst NACH Klick + SKIP_WAITING
   document.getElementById('updateNowBtn').onclick = () => {
     if (navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
     }
+    // Warte kurz, dann reload
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
     banner.remove();
   };
 }
@@ -1153,12 +1155,9 @@ if ('serviceWorker' in navigator) {
         if (!newWorker) return;
 
         newWorker.addEventListener('statechange', () => {
-        if (
-        newWorker.state === 'installed' &&
-        navigator.serviceWorker.controller
-        ) {
-        showUpdateUI(); // Immer anzeigen, wenn neue Version bereit
-        }
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+      showUpdateUI(); // Banner anzeigen
+             }
         });
     });
       })
@@ -1173,12 +1172,12 @@ if ('serviceWorker' in navigator) {
     }
   });
 
-  // Nach Update neu laden
+  // Nach Update fuer Debug
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    setTimeout(() => {
-      window.location.reload();
-    }, 100);
-  });
+  console.log('Neuer Service Worker übernimmt Kontrolle');
+  // KEIN reload() hier!
+});
+
 }
 
 // === PWA INSTALLATION ===
