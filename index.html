@@ -823,7 +823,7 @@
 
 <script>
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-const VERSION = '1.5.3.10';
+const VERSION = '1.5.3.11';
 const REPO_PATH = (
   location.hostname === 'localhost' ||
   location.hostname === '127.0.0.1' ||
@@ -1097,84 +1097,37 @@ function showPWAInstallBanner() {
   }, 20000);
 }
 
-// === UPDATE BANNER ===
-function showUpdateReady() {
-  if (document.getElementById('updateBanner')) return;
-
-  const currentVersion = VERSION;
-  const newVersion = targetVersion || 'neu';
-
-  const banner = document.createElement('div');
-  banner.id = 'updateBanner';
-  banner.innerHTML = `
-    <div style="background: linear-gradient(135deg, #27ae60, #2ecc71); color: white; padding: 16px 24px; border-radius: 16px; box-shadow: 0 8px 32px rgba(46,204,113,0.4); display: flex; align-items: center; gap: 14px; font-size: 15px; font-weight: 600; max-width: 380px; animation: slideIn 0.5s ease;">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-      </svg>
-      <div>
-        <strong>Update verfügbar!</strong><br>
-        <span style="font-size: 13px;">${currentVersion} → <strong>${newVersion}</strong></span>
-      </div>
-      <button id="installNow" style="background: white; color: #27ae60; border: none; border-radius: 10px; padding: 8px 16px; font-weight: 600; cursor: pointer;">Jetzt installieren</button>
-      <button id="closeBanner" style="background: none; border: none; color: white; font-size: 20px; cursor: pointer; margin-left: 8px;">×</button>
-    </div>
-  `;
-
-  document.body.appendChild(banner);
-
-  banner.querySelector('#installNow').onclick = () => {
-    if (!newWorker) return;
-    banner.style.opacity = '0';
-    banner.style.transition = 'opacity 0.3s ease';
-    setTimeout(() => banner.remove(), 300);
-    newWorker.postMessage({ action: 'skipWaiting' });
-  };
-
-  banner.querySelector('#closeBanner').onclick = () => banner.remove();
-
-  setTimeout(() => {
-    const b = document.getElementById('updateBanner');
-    if (b) b.remove();
-  }, 15000);
-}
-
-// === SERVICE WORKER ===
-const swUrl = `service-worker.js?v=${VERSION}`;
+// === SERVICE WORKER REGISTRIERUNG ===
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register(swUrl).then(reg => {
-    console.log('SW registriert mit Version:', VERSION);
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+      .then(reg => {
+        console.log('SW registriert:', reg.scope);
+        reg.update();
 
-    reg.addEventListener('updatefound', () => {
-      const installingWorker = reg.installing;
-      if (installingWorker) {
-        installingWorker.addEventListener('statechange', () => {
-          if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            newWorker = installingWorker;
-            showUpdateReady();
-          }
+        reg.addEventListener('updatefound', () => {
+          newWorker = reg.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              showUpdateUI();
+            }
+          });
         });
-      }
-    });
-
-    reg.update().catch(err => console.error('Update-Prüfung fehlgeschlagen:', err));
-  }).catch(err => {
-    console.error('SW Registrierung fehlgeschlagen:', err);
-    showFancyAlert('Service Worker Fehler', 'warning', 'Updates könnten nicht funktionieren.');
+      })
+      .catch(err => console.error('SW Registrierung fehlgeschlagen:', err));
   });
 
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    window.location.reload();
-  });
-
+  // Version anzeigen
   navigator.serviceWorker.addEventListener('message', event => {
     if (event.data?.type === 'NEW_VERSION') {
-      const newVersion = event.data.version;
-      if (newVersion !== VERSION) {
-        targetVersion = newVersion;
-        newWorker = event.source;
-        showUpdateReady();
-      }
+      const info = document.getElementById('versionInfo');
+      if (info) info.textContent = `v${event.data.version}`;
     }
+  });
+
+  // Nach Update neu laden
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
   });
 }
 
