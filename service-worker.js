@@ -1,5 +1,5 @@
 // service-worker.js
-const VERSION = '1.5.3.28';  // Erhöhe bei jedem Update!
+const VERSION = '1.5.3.29';  // Erhöhe bei jedem Update!
 const CACHE_NAME = `lerndashboard-v${VERSION.replace(/\./g, '')}`;
 const REPO_PATH = 'https://matthiasklossmpz.github.io/lerndashboard-test/';
 
@@ -31,24 +31,18 @@ self.addEventListener('message', event => {
 // === INSTALL === (DEIN BLOCK IST PERFEKT!)
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        return Promise.allSettled(
-          urlsToCache.map(url =>
-            fetch(url, { cache: 'reload' })
-              .then(response => {
-                if (!response.ok) throw new Error(`Failed: ${response.status} ${url}`);
-                return cache.put(url, response);
-              })
-              .catch(err => {
-                console.warn('SW: Caching failed (OK if offline):', url, err);
-              })
-          )
-        );
-      })
-      .then(() => {
-        console.log(`SW v${VERSION} installiert (fehlende Dateien ignoriert)`);
-      })
+    caches.open(CACHE_NAME).then(cache => {
+      return Promise.allSettled(
+        urlsToCache.map(url =>
+          fetch(url, { cache: 'reload' })
+            .then(r => { if (r.ok) return cache.put(url, r); })
+            .catch(() => {})
+        )
+      );
+    }).then(() => {
+      console.log(`SW v${VERSION} installiert`);
+      return self.skipWaiting(); // SOFORT AKTIVIEREN!
+    })
   );
 });
 
@@ -57,17 +51,17 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
-        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+        keys
+          .filter(k => k.startsWith('lerndashboard-v') && k !== CACHE_NAME)
+          .map(k => caches.delete(k))
       )
     ).then(() => {
-      console.log(`SW v${VERSION} aktiviert`);
-      return self.clients.claim();
+      console.log(`Alte Caches gelöscht → nur ${CACHE_NAME} bleibt`);
+      return self.clients.claim(); // NEUER SW ÜBERNIMMT SOFORT!
     }).then(() => {
-      return self.clients.matchAll().then(clients => {
-        clients.forEach(client => {
-          client.postMessage({ type: 'NEW_VERSION', version: VERSION });
-        });
-      });
+      return self.clients.matchAll().then(clients =>
+        clients.forEach(c => c.postMessage({ type: 'NEW_VERSION', version: VERSION }))
+      );
     })
   );
 });
