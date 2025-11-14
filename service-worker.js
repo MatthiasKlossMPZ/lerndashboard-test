@@ -31,13 +31,27 @@ self.addEventListener('message', event => {
 // === INSTALL ===
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
-      .then(() => {
-        console.log(`SW v${VERSION} installiert`);
-        // KEIN postMessage hier!
-      })
-  );
+  caches.open(CACHE_NAME)
+    .then(cache => {
+      // Einzeln fetchen → Fehler werden ignoriert (offline, 404, etc.)
+      return Promise.allSettled(
+        urlsToCache.map(url =>
+          fetch(url, { cache: 'reload' })
+            .then(response => {
+              if (!response.ok) throw new Error(`Failed: ${response.status} ${url}`);
+              return cache.put(url, response);
+            })
+            .catch(err => {
+              console.warn('SW: Caching failed (OK if offline):', url, err);
+              // Nicht abbrechen – weiter mit nächsten URLs
+            })
+        )
+      );
+    })
+    .then(() => {
+      console.log(`SW v${VERSION} installiert (fehlende Dateien ignoriert)`);
+    })
+);
 });
 
 // === ACTIVATE ===

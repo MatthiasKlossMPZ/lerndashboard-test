@@ -557,6 +557,16 @@
     background: rgba(255, 0, 0, 0.4);
     pointer-events: none; /* damit Klicks durchgehen */
 }
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes drawCircle {
+  to { stroke-dashoffset: 0; }
+}
+
     </style>
 </head>
 <body>
@@ -756,8 +766,7 @@
                     <button class="btn matrix filtered-export" onclick="exportMatrixCSV()" 
                             style="background:#e67e22;" 
                             title="Matrix als CSV – basierend auf aktuellen Filtern">Matrix CSV</button>
-                    <button class="btn matrix filtered-export" id="matrixPdfBtn"style="background:#9c27b0; color:white;"title="Matrix als PDF – nur gefilterte Daten"
-                            disabled>Matrix PDF</button>
+                    <button class="btn matrix filtered-export" id="matrixPdfBtn" style="background:#9c27b0; color:white;" title="Matrix als PDF – nur gefilterte Daten" onclick="exportMatrixPDF()">Matrix PDF</button>
                     <button class="btn matrix filtered-export" onclick="exportMatrixExcel()" 
                             style="background:#27ae60; color:white; border:2px solid #1e7e34;" 
                             title="Formatierte Excel-Matrix mit aktuellen Filtern">Matrix Excel</button>
@@ -813,47 +822,44 @@
     </svg>
 
 <script>
-// === GLOBALE VERSION ===
+// === GLOBALE VARIABLEN (EINZIGER ORT!) ===
 const VERSION = '1.5.3.9';
-
-// === RESSOURCEN LADEN (VOR ALLEM ANDEREN!) ===
-let resources = JSON.parse(localStorage.getItem('resources') || '[]');
-let tools = new Set(resources.map(r => r.tool?.trim().toLowerCase()).filter(Boolean));
-let dropdownsInitialized = false;
-
-// === REPO_PATH ===
 const REPO_PATH = (
   location.hostname === 'localhost' ||
   location.hostname === '127.0.0.1' ||
   location.protocol === 'file:'
 ) ? '/' : 'https://matthiasklossmpz.github.io/lerndashboard-test';
 
-// === DATEN FÜR DROPDOWNS ===
+let resources = JSON.parse(localStorage.getItem('resources') || '[]');
+let tools = new Set(resources.map(r => r.tool?.trim().toLowerCase()).filter(Boolean));
+let dropdownsInitialized = false;
+
+let deferredPrompt = null;
+let newWorker = null;
+let targetVersion = null;
+
+// === DROPDOWN-DATEN ===
 const subjects = ['Deutsch','Mathematik','Englisch','Biologie','Chemie','Physik','Geschichte','Geografie','Politik','Wirtschaft','Informatik','Kunst','Musik','Sport','Ethik','Religion'];
 const grades = ['Klasse 5','Klasse 6','Klasse 7','Klasse 8','Klasse 9','Klasse 10','Klasse 11','Klasse 12','Klasse 13'];
 const competences = [
-    'Suchen, Verarbeiten und Aufbewahren',
-    'Kommunizieren und Kooperieren',
-    'Produzieren und Präsentieren',
-    'Schützen und sicher Agieren',
-    'Problemlösen und Handeln',
-    'Analysieren und Reflektieren'
+  'Suchen, Verarbeiten und Aufbewahren',
+  'Kommunizieren und Kooperieren',
+  'Produzieren und Präsentieren',
+  'Schützen und sicher Agieren',
+  'Problemlösen und Handeln',
+  'Analysieren und Reflektieren'
 ];
 
-// === 2. ALLE FUNKTIONEN DEFINIEREN (VOR ALLEM ANDEREN!) ===
-
-// --- escapeJs ---
+// === ALLE FUNKTIONEN ===
 function escapeJs(str) {
     if (!str) return '';
     return str.replace(/'/g, "\\'").replace(/"/g, "\\\"");
 }
 
-// --- getSchoolName ---
 function getSchoolName() {
     return localStorage.getItem('schoolName');
 }
 
-// --- updateSchoolButton ---
 function updateSchoolButton() {
     const btn = document.getElementById('schoolButton');
     if (!btn) return;
@@ -869,7 +875,21 @@ function updateSchoolButton() {
     }
 }
 
-// --- setFilterAndApply ---
+function setSchoolName() {
+    const current = getSchoolName();
+    const name = prompt('Schulname eingeben:', current || '');
+    if (name !== null) {
+        const trimmed = name.trim();
+        if (trimmed) {
+            localStorage.setItem('schoolName', trimmed);
+        } else {
+            localStorage.removeItem('schoolName');
+        }
+        updateSchoolButton();
+        document.getElementById('printSchoolNameText').textContent = getSchoolName() || 'Deine Schule';
+    }
+}
+
 function setFilterAndApply(filterId, value) {
     const select = document.getElementById(filterId);
     if (select) {
@@ -879,7 +899,6 @@ function setFilterAndApply(filterId, value) {
     }
 }
 
-// --- updateToolFilter ---
 function updateToolFilter() {
     const s = document.getElementById('filterTool');
     if (s) {
@@ -891,7 +910,6 @@ function updateToolFilter() {
     }
 }
 
-// --- updateFilterHighlight ---
 function updateFilterHighlight() {
     const container = document.querySelector('.filter-container');
     if (!container) return;
@@ -902,7 +920,6 @@ function updateFilterHighlight() {
     container.classList.toggle('active', isActive);
 }
 
-// --- updateFilterStatus ---
 function updateFilterStatus() {
     const isFiltered = getFilteredResources().length < resources.length;
     const title = document.getElementById('filterExportTitle');
@@ -915,7 +932,6 @@ function updateFilterStatus() {
     });
 }
 
-// --- populateDropdowns ---
 function populateDropdowns() {
     const addOptions = (id, options) => {
         const select = document.getElementById(id);
@@ -930,7 +946,6 @@ function populateDropdowns() {
     updateToolFilter();
 }
 
-// --- getFilteredResources ---
 function getFilteredResources() {
     const f = {
         subject: document.getElementById('filterSubject')?.value?.toLowerCase() || '',
@@ -960,7 +975,6 @@ function getFilteredResources() {
     });
 }
 
-// --- updateStats ---
 function updateStats() {
     const filtered = getFilteredResources();
     document.getElementById('statTotal').textContent = filtered.length;
@@ -970,7 +984,6 @@ function updateStats() {
     updateSubjectStats(filtered);
 }
 
-// --- updateSubjectBarStats ---
 function updateSubjectStats(filtered) {
     const count = filtered.reduce((a, r) => (a[r.subject] = (a[r.subject] || 0) + 1, a), {});
     const container = document.getElementById('statsFach');
@@ -991,25 +1004,6 @@ function updateSubjectStats(filtered) {
         });
 }
 
-// --- checkForAppUpdate ---
-function checkForAppUpdate() {
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistration().then(reg => {
-            if (reg) reg.update();
-        });
-    }
-}
-
-// --- registerUpdateListener ---
-function registerUpdateListener() {
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-            window.location.reload();
-        });
-    }
-}
-
-    // === FILTER & ANZEIGE ===
 function applyFilters() {
     const filtered = getFilteredResources();
     displayResources(filtered);
@@ -1018,216 +1012,191 @@ function applyFilters() {
     updateFilterStatus();
 }
 
-    function resetFilters() {
-        ['filterSubject','filterGrade','filterCompetence','filterLevel','filterTool','filterFavorite'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.value = '';
-        });
-        const search = document.getElementById('searchTopic');
-        if (search) search.value = '';
-        applyFilters();
-    }
-
-function showAlert(message, callback) {
-    const modal = document.createElement('div');
-    modal.className = 'modal-outer';
-    modal.style.cssText = `
-        position:fixed;top:0;left:0;width:100%;height:100%;
-        background:rgba(0,0,0,0.6);display:flex;justify-content:center;
-        align-items:center;z-index:10001;
-    `;
-    modal.innerHTML = `
-        <div style="
-            background:#fff;padding:24px;border-radius:16px;max-width:400px;
-            text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.2);
-        ">
-            <p style="margin:0 0 16px;white-space:pre-line;line-height:1.5;">
-                ${message.replace(/\n/g, '<br>')}
-            </p>
-            <div style="display:flex;gap:10px;justify-content:center;">
-                <button id="alert-ok-btn" 
-                        style="background:#6b46c1;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600;">
-                    OK
-                </button>
-                ${callback ? `
-                <button id="alert-cancel-btn" 
-                        style="background:#95a5a6;color:white;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:600;">
-                    Abbrechen
-                </button>` : ''}
-            </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-
-    const removeModal = () => modal.remove();
-
-    // Jetzt mit korrekten IDs!
-    modal.querySelector('#alert-ok-btn')?.addEventListener('click', () => {
-        removeModal();
-        if (callback) callback();
+function resetFilters() {
+    ['filterSubject','filterGrade','filterCompetence','filterLevel','filterTool','filterFavorite'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
     });
-
-    modal.querySelector('#alert-cancel-btn')?.addEventListener('click', removeModal);
-
-    // Optional: ESC zum Abbrechen
-    const escHandler = (e) => {
-        if (e.key === 'Escape') {
-            removeModal();
-            document.removeEventListener('keydown', escHandler);
-        }
-    };
-    document.addEventListener('keydown', escHandler);
-}
-
-function toggleFavorite(i) {
-    resources[i].favorite = !resources[i].favorite;
-    localStorage.setItem('resources', JSON.stringify(resources)); // JETZT DA!
+    const search = document.getElementById('searchTopic');
+    if (search) search.value = '';
     applyFilters();
 }
 
-function displayResources(list) {
-    const c = document.getElementById('resourcesList');
-    if (!c) return;
-    c.innerHTML = '';
-    list.forEach((r, i) => {
-        // SICHERER INDEX: Vergleich aller Felder
-        const realIndex = resources.findIndex(res => 
-            res.topic === r.topic && 
-            res.subject === r.subject && 
-            res.grade === r.grade && 
-            res.competence === r.competence &&
-            (res.tool || '') === (r.tool || '') &&
-            (res.description || '') === (r.description || '')
-        );
+// === VERSION ANZEIGEN ===
+window.addEventListener('load', () => {
+  const el = document.getElementById('versionInfo');
+  if (el) el.textContent = `Version ${VERSION}`;
+});
 
-        const d = document.createElement('div');
-        d.className = 'resource-item';
-        d.dataset.index = realIndex >= 0 ? realIndex : i; // Fallback
+// === EMPFANGE ÄNDERUNGEN AUS EDIT-POPUP ===
+window.addEventListener('message', function(event) {
+    if (event.data && event.data.type === 'UPDATE_RESOURCE') {
+        const { index, data } = event.data;
 
-        d.innerHTML = `
-            <div class="resource-content">
-                <strong>${r.topic}</strong>
-                <span class="tag subject-tag" onclick="setFilterAndApply('filterSubject', '${escapeJs(r.subject)}')">${r.subject}</span>
-                <span class="tag grade-tag" onclick="setFilterAndApply('filterGrade', '${escapeJs(r.grade)}')">${r.grade}</span>
-                <span class="tag competence-tag" onclick="setFilterAndApply('filterCompetence', '${escapeJs(r.competence)}')">${r.competence}</span>
-                <span class="tag level-tag">${r.level || '—'}</span>
-               ${r.tool ? `<span class="tag tool-tag" onclick="setFilterAndApply('filterTool', '${escapeJs(r.tool.toLowerCase())}')">${escapeJs(r.tool)}</span>` : ''}
-                ${r.description ? `<div class="description">${r.description}</div>` : ''}
-                ${r.lastModified ? `<div style="font-size:11px; color:#888; margin-top:6px;">Zuletzt: ${r.lastModified}</div>` : ''}
-            </div>
-            <div class="action-icons">
-                <div class="action-icon favorite-icon ${r.favorite ? 'active' : ''}"
-                     onclick="toggleFavorite(${realIndex})">
-                    <svg><use xlink:href="#star-icon"/></svg>
-                </div>
-                <div class="action-icon edit-icon"
-                     onclick="editResource(${realIndex})">
-                    <svg><use xlink:href="#edit-icon"/></svg>
-                </div>
-                <div class="action-icon delete-icon"
-                     onclick="deleteResource(${realIndex})">
-                    <svg><use xlink:href="#delete-icon"/></svg>
-                </div>
-            </div>`;
-        c.appendChild(d);
-    });
-}
+        if (index >= 0 && index < resources.length) {
+            resources[index] = data;
+            localStorage.setItem('resources', JSON.stringify(resources));
+            applyFilters(); // Aktualisiert Dashboard + Matrix
 
-    // === BEARBEITEN ===
-    function editResource(i) {
-        const r = resources[i];
-        const data = encodeURIComponent(JSON.stringify(r));
-        const url = `edit-resource.html?index=${i}&data=${data}`;
-        const popup = window.open(url, 'editResource', 'width=680,height=760,resizable=yes,scrollbars=yes');
-        if (popup) {
-            popup.focus();
-        } else {
-            alert('Popup wurde blockiert – bitte erlauben!');
+            // Erfolgsanimation
+            const anim = document.getElementById('editAnimation');
+            if (anim) {
+                anim.classList.add('edit-active');
+                setTimeout(() => anim.classList.remove('edit-active'), 1200);
+            }
         }
     }
+});
 
-function deleteResource(i) {
-    const resource = resources[i];
-    if (!resource) return;
+// === PWA INSTALL BANNER ===
+function showPWAInstallBanner() {
+  let banner = document.getElementById('pwaInstallBanner');
+  if (banner) {
+    banner.style.display = 'flex';
+    return;
+  }
 
-    // Bestätigungs-Popup
-    showAlert(
-        `Möchtest du die Ressource wirklich löschen?\n\n` +
-        `<strong>${resource.topic}</strong>\n` +
-        `${resource.subject} | ${resource.grade} | ${resource.competence}${resource.level ? ' | ' + resource.level : ''}`,
-        () => {
-            // Bestätigt → Löschen mit Animation
-            const anim = document.getElementById('deleteAnimation');
-            anim.classList.add('delete-active');
+  banner = document.createElement('div');
+  banner.id = 'pwaInstallBanner';
+  banner.style.cssText = `
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:#6b46c1; color:white; padding:12px 20px; border-radius:12px;
+    box-shadow:0 8px 32px rgba(107,70,193,0.4); font-size:14px; z-index:9998;
+    display:flex; align-items:center; gap:10px; animation:slideUp 0.5s ease;
+  `;
+  banner.innerHTML = `
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+    </svg>
+    <strong>App installieren?</strong>
+    <button id="installPwaBtn" style="background:white; color:#6b46c1; border:none; border-radius:8px; padding:4px 12px; margin-left:8px; font-weight:600; cursor:pointer;">Installieren</button>
+    <button id="closePwaBanner" style="background:none; border:none; color:white; font-size:18px; margin-left:8px; cursor:pointer;">×</button>
+  `;
 
-            try {
-                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBQ==');
-                audio.volume = 0.2;
-                audio.play();
-            } catch(e) {}
+  document.body.appendChild(banner);
 
-            setTimeout(() => {
-                resources.splice(i, 1);
-                localStorage.setItem('resources', JSON.stringify(resources));
-                applyFilters();
-                anim.classList.remove('delete-active');
-            }, 1600);
-        }
-    );
+  document.getElementById('installPwaBtn').onclick = async () => {
+    banner.style.display = 'none';
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log('PWA Installation:', outcome);
+    deferredPrompt = null;
+  };
+
+  document.getElementById('closePwaBanner').onclick = () => {
+    banner.style.display = 'none';
+    deferredPrompt = null;
+  };
+
+  setTimeout(() => {
+    if (banner && banner.style.display !== 'none') {
+      banner.style.display = 'none';
+      deferredPrompt = null;
+    }
+  }, 20000);
 }
 
-    // === AUTOCOMPLETE ===
-    const searchInput = document.getElementById('searchTopic');
-    const suggestions = document.getElementById('suggestions');
-    if (searchInput && suggestions) {
-        searchInput.oninput = e => {
-            suggestions.innerHTML = '';
-            const v = e.target.value.toLowerCase().trim();
-            if (!v) { suggestions.style.display = 'none'; return; }
-            const m = [...new Set(resources.map(r => r.topic).filter(t => t.toLowerCase().includes(v)))].slice(0, 6);
-            if (!m.length) { suggestions.style.display = 'none'; return; }
-            m.forEach(t => {
-                const d = document.createElement('div');
-                d.textContent = t;
-                d.onclick = () => { searchInput.value = t; suggestions.style.display = 'none'; applyFilters(); };
-                suggestions.appendChild(d);
-            });
-            suggestions.style.display = 'block';
-        };
-        document.addEventListener('click', e => {
-            if (!searchInput.contains(e.target) && !suggestions.contains(e.target)) {
-                suggestions.style.display = 'none';
-            }
+// === UPDATE BANNER ===
+function showUpdateReady() {
+  if (document.getElementById('updateBanner')) return;
+
+  const currentVersion = VERSION;
+  const newVersion = targetVersion || 'neu';
+
+  const banner = document.createElement('div');
+  banner.id = 'updateBanner';
+  banner.innerHTML = `
+    <div style="background: linear-gradient(135deg, #27ae60, #2ecc71); color: white; padding: 16px 24px; border-radius: 16px; box-shadow: 0 8px 32px rgba(46,204,113,0.4); display: flex; align-items: center; gap: 14px; font-size: 15px; font-weight: 600; max-width: 380px; animation: slideIn 0.5s ease;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+      </svg>
+      <div>
+        <strong>Update verfügbar!</strong><br>
+        <span style="font-size: 13px;">${currentVersion} → <strong>${newVersion}</strong></span>
+      </div>
+      <button id="installNow" style="background: white; color: #27ae60; border: none; border-radius: 10px; padding: 8px 16px; font-weight: 600; cursor: pointer;">Jetzt installieren</button>
+      <button id="closeBanner" style="background: none; border: none; color: white; font-size: 20px; cursor: pointer; margin-left: 8px;">×</button>
+    </div>
+  `;
+
+  document.body.appendChild(banner);
+
+  banner.querySelector('#installNow').onclick = () => {
+    if (!newWorker) return;
+    banner.style.opacity = '0';
+    banner.style.transition = 'opacity 0.3s ease';
+    setTimeout(() => banner.remove(), 300);
+    newWorker.postMessage({ action: 'skipWaiting' });
+  };
+
+  banner.querySelector('#closeBanner').onclick = () => banner.remove();
+
+  setTimeout(() => {
+    const b = document.getElementById('updateBanner');
+    if (b) b.remove();
+  }, 15000);
+}
+
+// === SERVICE WORKER ===
+const swUrl = `service-worker.js?v=${VERSION}`;
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register(swUrl).then(reg => {
+    console.log('SW registriert mit Version:', VERSION);
+
+    reg.addEventListener('updatefound', () => {
+      const installingWorker = reg.installing;
+      if (installingWorker) {
+        installingWorker.addEventListener('statechange', () => {
+          if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            newWorker = installingWorker;
+            showUpdateReady();
+          }
         });
-    }
-// === CSV-PARSER (ROBUST & KORREKT) ===
-function parseCSVLine(line) {
-    if (!line) return [];
-    const result = [];
-    let field = '';
-    let inQuotes = false;
+      }
+    });
 
-    for (let i = 0; i < line.length; i++) {
-        const char = line[i];
-        const next = line[i + 1];
+    reg.update().catch(err => console.error('Update-Prüfung fehlgeschlagen:', err));
+  }).catch(err => {
+    console.error('SW Registrierung fehlgeschlagen:', err);
+    showFancyAlert('Service Worker Fehler', 'warning', 'Updates könnten nicht funktionieren.');
+  });
 
-        if (char === '"') {
-            if (inQuotes && next === '"') {
-                field += '"';
-                i++;
-            } else {
-                inQuotes = !inQuotes;
-            }
-        } else if (char === ',' && !inQuotes) {
-            result.push(field);
-            field = '';
-        } else {
-            field += char;
-        }
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
+
+  navigator.serviceWorker.addEventListener('message', event => {
+    if (event.data?.type === 'NEW_VERSION') {
+      const newVersion = event.data.version;
+      if (newVersion !== VERSION) {
+        targetVersion = newVersion;
+        newWorker = event.source;
+        showUpdateReady();
+      }
     }
-    result.push(field);
-    return result.map(s => s.replace(/^"|"$/g, '').trim());
+  });
 }
+
+// === PWA INSTALLATION ===
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  showPWAInstallBanner();
+});
+
+// === INIT ===
+['filterSubject','filterGrade','filterTool','filterCompetence','filterLevel','filterFavorite'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', applyFilters);
+});
+const searchEl = document.getElementById('searchTopic');
+if (searchEl) searchEl.addEventListener('input', applyFilters);
+
+populateDropdowns();
+applyFilters();
+applyFilters();
+document.getElementById('matrixPdfBtn')?.addEventListener('click', exportMatrixPDF);
 
 function exportTemplate() {
     const template = [
@@ -1263,7 +1232,7 @@ function exportCSV() {
     const fullCsv = `${COLUMNS.join(',')}\n${csvContent}`;
     const csvBlob = new Blob(['\uFEFF' + fullCsv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
+    link.href = URL.createObjectURL(csvBlob);
     link.download = `LernDashboard_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     // Nach dem Download des CSV
@@ -1276,229 +1245,133 @@ function exportPDF() {
         return;
     }
 
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    let y = 30;
-    const lineHeight = 6;
-    const startX = 15;
-    let pageNumber = 1;
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        let y = 30;
+        const lineHeight = 6;
+        const startX = 15;
+        let pageNumber = 1;
 
-    // Schulname
-    const schoolName = getSchoolName() || 'Deine Schule';
-    doc.setFontSize(11);
-    doc.setTextColor(schoolName === 'Deine Schule' ? 150 : 80);
-    doc.setFont('helvetica', 'italic');
-    doc.text(schoolName, pageWidth - 15, 15, { align: 'right' });
-
-    // Titel
-    doc.setFontSize(20);
-    doc.setTextColor(107, 70, 193);
-    doc.setFont('helvetica', 'bold');
-    doc.text('LernDashboard Digital', pageWidth / 2, y, { align: 'center' });
-    y += 8;
-    doc.setFontSize(11);
-    doc.setTextColor(100);
-    doc.text('Gefilterte Unterrichtsideen', pageWidth / 2, y, { align: 'center' });
-    y += 10;
-    doc.setFontSize(9);
-    doc.setTextColor(120);
-    doc.text(`Exportiert am: ${new Date().toLocaleDateString('de-DE')}`, pageWidth - 15, y, { align: 'right' });
-    y += 12;
-
-    const addPageIfNeeded = (h) => {
-        if (y + h > pageHeight - 25) {
-            doc.setFontSize(8);
-            doc.setTextColor(150);
-            doc.text(`Seite ${pageNumber}`, pageWidth - 20, pageHeight - 10);
-            doc.addPage();
-            pageNumber++;
-            y = 20;
-            doc.setFontSize(10);
-            doc.setTextColor(150);
-            doc.text('LernDashboard Digital – Fortsetzung', pageWidth / 2, y, { align: 'center' });
-            y += 8;
-        }
-    };
-
-    const tagColors = { subject: [155,89,182], grade: [80,200,120], competence: [255,140,0], level: [0,191,255], tool: [30,144,255] };
-
-    filtered.forEach((r, i) => {
-        const topic = r.topic || '—';
-        const subject = r.subject || '—';
-        const grade = r.grade || '—';
-        const competence = r.competence || '—';
-        const level = r.level || '—';
-        const tool = r.tool || '—';
-        const description = r.description || '';
-
+        // Schulname
+        const schoolName = getSchoolName() || 'Deine Schule';
         doc.setFontSize(11);
-        doc.setTextColor(0);
+        doc.setTextColor(schoolName === 'Deine Schule' ? 150 : 80);
+        doc.setFont('helvetica', 'italic');
+        doc.text(schoolName, pageWidth - 15, 15, { align: 'right' });
+
+        // Titel
+        doc.setFontSize(20);
+        doc.setTextColor(107, 70, 193);
         doc.setFont('helvetica', 'bold');
-        const topicLines = doc.splitTextToSize(`${i + 1}. ${topic}`, pageWidth - 30);
-        addPageIfNeeded(topicLines.length * lineHeight + 5);
-        doc.text(topicLines, startX, y);
-        y += topicLines.length * lineHeight + 3;
-
-        let x = startX;
-        const tagHeight = 5, tagPadding = 2, tagGap = 6, textY = y - 0.7;
-        const tags = [{text:subject,type:'subject'},{text:grade,type:'grade'},{text:competence,type:'competence'},{text:level,type:'level'},{text:tool,type:'tool'}];
-        doc.setFontSize(8.5);
-        doc.setFont('helvetica', 'normal');
-        tags.forEach(tag => {
-            if (tag.text === '—') return;
-            const color = tagColors[tag.type];
-            const textWidth = doc.getTextWidth(tag.text);
-            const tagWidth = textWidth + 2 * tagPadding;
-            doc.setFillColor(...color);
-            doc.roundedRect(x, y - tagHeight + 0.8, tagWidth, tagHeight, 1.8, 1.8, 'F');
-            doc.setTextColor(255);
-            doc.text(tag.text, x + tagPadding, textY);
-            x += tagWidth + tagGap;
-        });
-        y += 6;
-
-        if (description) {
-            doc.setFontSize(9);
-            doc.setTextColor(70);
-            doc.setFont('helvetica', 'italic');
-            const descLines = doc.splitTextToSize(description, pageWidth - 30);
-            const descHeight = descLines.length * lineHeight;
-            addPageIfNeeded(descHeight + 8);
-            doc.setFillColor(248, 250, 252);
-            doc.rect(startX - 1, y - 1.5, pageWidth - 30 + 2, descHeight + 3, 'F');
-            doc.text(descLines, startX, y + lineHeight - 1);
-            y += descHeight + 6;
-        } else y += 4;
-
-        doc.setDrawColor(220);
-        doc.setLineWidth(0.3);
-        doc.line(startX, y, pageWidth - 15, y);
+        doc.text('LernDashboard Digital', pageWidth / 2, y, { align: 'center' });
         y += 8;
-    });
+        doc.setFontSize(11);
+        doc.setTextColor(100);
+        doc.text('Gefilterte Unterrichtsideen', pageWidth / 2, y, { align: 'center' });
+        y += 10;
+        doc.setFontSize(9);
+        doc.setTextColor(120);
+        doc.text(`Exportiert am: ${new Date().toLocaleDateString('de-DE')}`, pageWidth - 15, y, { align: 'right' });
+        y += 12;
 
-    doc.setFontSize(8);
-    doc.setTextColor(150);
-    doc.text(`Seite ${pageNumber}`, pageWidth - 20, pageHeight - 10);
-    doc.save(`LernDashboard_${new Date().toISOString().slice(0, 10)}.pdf`);
-    showFancyAlert('PDF Export erfolgreich!', 'success');
-}
-
-// === BEARB. BESTÄTIGUNG (ohne Ton) ===
-function showEditConfirmation() {
-    const anim = document.getElementById('editAnimation');
-    anim.classList.add('edit-active');
-
-    // Nach 1,6 Sekunden automatisch ausblenden
-    setTimeout(() => {
-        anim.classList.remove('edit-active');
-    }, 1600);
-}
-        // === HINZUFÜGEN BESTÄTIGUNG ===
-function showAddConfirmation() {
-    const anim = document.getElementById('addAnimation');
-    anim.classList.add('add-active');
-    setTimeout(() => anim.classList.remove('add-active'), 1600);
-}
-    // === INIT ===
-    ['filterSubject','filterGrade','filterTool','filterCompetence','filterLevel','filterFavorite'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener('change', applyFilters);
-    });
-    const searchEl = document.getElementById('searchTopic');
-    if (searchEl) searchEl.addEventListener('input', applyFilters);
-
-if (!navigator.onLine) {
-    showAlert('Offline-Modus aktiv – Änderungen werden lokal gespeichert.');
-}
-
-window.addEventListener('online', () => {
-    showAlert('Internetverbindung wiederhergestellt.');
-});
-window.addEventListener('offline', () => {
-    showAlert('Offline-Modus aktiv – Änderungen werden lokal gespeichert.');
-});
-    populateDropdowns();
-    applyFilters();
-
-// === POPUP-KOMMUNIKATION (NEU + UPDATE) ===
-window.addEventListener('message', function(event) {
-    // NEUE RESSOURCE HINZUFÜGEN
-    if (event.data?.action === 'addResource') {
-        const resource = event.data.resource;
-        if (resource && resource.topic && resource.subject && resource.grade && resource.competence && resource.level) {
-            // Tool: Originalgroßschreibung beibehalten, nur für Filter klein
-            const originalTool = resource.tool?.trim();
-            if (originalTool) {
-                resource.tool = originalTool;
-                tools.add(originalTool.toLowerCase());
+        const addPageIfNeeded = (h) => {
+            if (y + h > pageHeight - 25) {
+                doc.setFontSize(8);
+                doc.setTextColor(150);
+                doc.text(`Seite ${pageNumber}`, pageWidth - 20, pageHeight - 10);
+                doc.addPage();
+                pageNumber++;
+                y = 20;
+                doc.setFontSize(10);
+                doc.setTextColor(150);
+                doc.text('LernDashboard Digital – Fortsetzung', pageWidth / 2, y, { align: 'center' });
+                y += 8;
             }
-            resources.push(resource);
-            localStorage.setItem('resources', JSON.stringify(resources));
-            applyFilters();
-            updateToolFilter();
-            showAddConfirmation();
-        }
-    }
-    // RESSOURCE AKTUALISIEREN
-    else if (event.data?.action === 'updateResource') {
-        const { index, resource } = event.data;
-        if (index >= 0 && index < resources.length && resource) {
-            const originalTool = resource.tool?.trim();
-            if (originalTool) {
-                resource.tool = originalTool;
-                tools.add(originalTool.toLowerCase());
-            }
-            resources[index] = resource;
-            localStorage.setItem('resources', JSON.stringify(resources));
-            applyFilters();
-            updateToolFilter();
-            showEditConfirmation();
-        }
-    }
-});
+        };
 
-// === CHROME TOOLTIP-FIX BEIM DRUCKEN ===
-let printTooltipFix = false;
-window.addEventListener('beforeprint', () => {
-    printTooltipFix = true;  // Flag setzen
-    // Sofort Tooltips ausblenden
-    document.querySelectorAll('.btn[title]').forEach(btn => {
-        btn.blur();  // Hover "abbrechen"
-    });
-});
+        const tagColors = { subject: [155,89,182], grade: [80,200,120], competence: [255,140,0], level: [0,191,255], tool: [30,144,255] };
 
-window.addEventListener('afterprint', () => {
-    printTooltipFix = false;
-    // Tooltip-Container leeren (falls sichtbar)
-    document.querySelectorAll('::after, ::before').forEach(el => el.remove());  // Fallback-Cleanup
-    // Oder: Hover manuell zurücksetzen
-    document.body.style.cursor = 'default';
-});
+        filtered.forEach((r, i) => {
+            const topic = r.topic || '—';
+            const subject = r.subject || '—';
+            const grade = r.grade || '—';
+            const competence = r.competence || '—';
+            const level = r.level || '—';
+            const tool = r.tool || '—';
+            const description = r.description || '';
 
-  function openNewResourceWindow() {
-    const url = 'new-resource.html';
-    const popup = window.open(url, 'newResource', 'width=680,height=760,resizable=yes,scrollbars=yes');
-    if (popup) {
-        popup.focus();
-    } else {
-        alert('Popup wurde blockiert – bitte erlauben!');
+            doc.setFontSize(11);
+            doc.setTextColor(0);
+            doc.setFont('helvetica', 'bold');
+            const topicLines = doc.splitTextToSize(`${i + 1}. ${topic}`, pageWidth - 30);
+            addPageIfNeeded(topicLines.length * lineHeight + 5);
+            doc.text(topicLines, startX, y);
+            y += topicLines.length * lineHeight + 3;
+
+            let x = startX;
+            const tagHeight = 5, tagPadding = 2, tagGap = 6, textY = y - 0.7;
+            const tags = [{text:subject,type:'subject'},{text:grade,type:'grade'},{text:competence,type:'competence'},{text:level,type:'level'},{text:tool,type:'tool'}];
+            doc.setFontSize(8.5);
+            doc.setFont('helvetica', 'normal');
+            tags.forEach(tag => {
+                if (tag.text === '—') return;
+                const color = tagColors[tag.type];
+                const textWidth = doc.getTextWidth(tag.text);
+                const tagWidth = textWidth + 2 * tagPadding;
+                doc.setFillColor(...color);
+                doc.roundedRect(x, y - tagHeight + 0.8, tagWidth, tagHeight, 1.8, 1.8, 'F');
+                doc.setTextColor(255);
+                doc.text(tag.text, x + tagPadding, textY);
+                x += tagWidth + tagGap;
+            });
+            y += 6;
+
+            if (description) {
+                doc.setFontSize(9);
+                doc.setTextColor(70);
+                doc.setFont('helvetica', 'italic');
+                const descLines = doc.splitTextToSize(description, pageWidth - 30);
+                const descHeight = descLines.length * lineHeight;
+                addPageIfNeeded(descHeight + 8);
+                doc.setFillColor(248, 250, 252);
+                doc.rect(startX - 1, y - 1.5, pageWidth - 30 + 2, descHeight + 3, 'F');
+                doc.text(descLines, startX, y + lineHeight - 1);
+                y += descHeight + 6;
+            } else y += 4;
+
+            doc.setDrawColor(220);
+            doc.setLineWidth(0.3);
+            doc.line(startX, y, pageWidth - 15, y);
+            y += 8;
+        });
+
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(`Seite ${pageNumber}`, pageWidth - 20, pageHeight - 10);
+        doc.save(`LernDashboard_${new Date().toISOString().slice(0, 10)}.pdf`);
+        showFancyAlert('PDF Export erfolgreich!', 'success');
+    } catch (err) {
+        console.error('PDF-Export fehlgeschlagen:', err);
+        showAlert('Fehler beim PDF-Export. Bitte Seite neu laden.');
     }
 }
+
 function exportMatrixCSV() {
+    const filtered = getFilteredResources();
+    if (filtered.length === 0) {
+        showFancyAlert('Keine gefilterten Daten!', 'warning');
+        return;
+    }
+
     const subjectFilter = document.getElementById('filterSubject')?.value?.trim() || '';
     const gradeFilter = document.getElementById('filterGrade')?.value?.trim() || '';
     const toolFilter = document.getElementById('filterTool')?.value?.trim().toLowerCase() || '';
 
-    // === DYNAMISCHE ÜBERSCHRIFT (mit | und "Alle Klassen") ===
-    const subjectText = subjectFilter ? subjectFilter : 'Alle Fächer';
-    let gradeText = '';
-    if (gradeFilter) {
-        gradeText = gradeFilter;
-    } else {
-        gradeText = 'Alle Klassen';
-    }
+    const subjectText = subjectFilter || 'Alle Fächer';
+    const gradeText = gradeFilter || 'Alle Klassen';
     const toolText = toolFilter ? ` | Tool: ${toolFilter}` : '';
     const title = `${subjectText} | ${gradeText}${toolText}`;
 
@@ -1510,52 +1383,54 @@ function exportMatrixCSV() {
         "Problemlösen und Handeln",
         "Analysieren und Reflektieren"
     ];
+
     const levels = ["Niveaustufe 1", "Niveaustufe 2", "Niveaustufe 3", "Niveaustufe 4", "Niveaustufe 5"];
 
-    // === FARBMAPS FÜR NIVEAUSTUFEN (GRÜN → ROT) ===
-const levelColors = {
-    'Niveaustufe 1': 'FF32CD32', // Dunkelgrün
-    'Niveaustufe 2': 'FF228B22', // Hellgrün
-    'Niveaustufe 3': 'FFFFFF00', // Gelb
-    'Niveaustufe 4': 'FFFFA500', // Orange
-    'Niveaustufe 5': 'FF8B0000'  // Dunkelrot
-};
-    // === DATEN FÜR MATRIX (nur Fach, Klasse, Tool filtern) ===
     const matrix = {};
     competences.forEach(c => {
         matrix[c] = {};
         levels.forEach(l => matrix[c][l] = new Set());
     });
 
-    // Gehe durch ALLE Ressourcen
-    resources.forEach(r => {
-        const subject = r.subject?.trim();
-        const grade = r.grade?.trim();
-        const tool = r.tool?.trim().toLowerCase();
-        const comp = r.competence?.trim();
-        const level = r.level?.trim();
-        const topic = r.topic?.trim();
+    // DEBUG: Zeig an, welche Daten verarbeitet werden
+    console.log("Verarbeite Ressourcen:", filtered.map(r => ({
+        topic: r.topic,
+        competence: r.competence,
+        level: r.level,
+        grade: r.grade,
+        tool: r.tool
+    })));
 
-        if (!comp || !level || !topic) return;
+    filtered.forEach(r => {
+        // NORMALISIERE: trim + exakter String
+        const comp = (r.competence || '').trim();
+        const level = (r.level || '').trim();
+        const topic = (r.topic || '').trim();
+        const tool = (r.tool || '').trim();
 
-        // Filterprüfung
-        const matchesSubject = !subjectFilter || subject === subjectFilter;
-        const matchesGrade = !gradeFilter || grade === gradeFilter;
-        const matchesTool = !toolFilter || tool === toolFilter;
-
-        if (matchesSubject && matchesGrade && matchesTool) {
-            const entry = `${topic} (${grade}${r.tool ? ` – ${r.tool}` : ''})`;
-            matrix[comp][level].add(entry);
+        // Prüfe, ob comp und level in den Listen VORHANDEN sind
+        if (!competences.includes(comp)) {
+            console.warn("Kompetenz nicht erkannt:", comp, "(verfügbar:", competences, ")");
+            return;
         }
+        if (!levels.includes(level)) {
+            console.warn("Niveaustufe nicht erkannt:", level, "(verfügbar:", levels, ")");
+            return;
+        }
+        if (!topic) return;
+
+        const entry = `${topic} (${r.grade}${tool ? ` – ${tool}` : ''})`;
+        matrix[comp][level].add(entry);
     });
 
-    // === CSV GENERIEREN ===
-    let csv = '\uFEFF'; // UTF-8 BOM
-    csv += `"Titel: ${title}"\n\n`; // Dynamische Überschrift
+    // DEBUG: Zeig Matrix an
+    console.log("Matrix-Inhalt:", matrix);
+
+    let csv = '\uFEFF"Titel: ${title}"\n\n';
     csv += '"Kompetenz";' + levels.map(l => `"${l}"`).join(';') + '\n';
 
     competences.forEach(comp => {
-        let row = [`"${comp}"`];
+        const row = [`"${comp}"`];
         levels.forEach(level => {
             const entries = [...matrix[comp][level]];
             const cell = entries.length > 0 ? entries.join('\n') : '—';
@@ -1564,13 +1439,12 @@ const levelColors = {
         csv += row.join(';') + '\n';
     });
 
-    // Download
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(matrixBlob);
-    link.download = `LernDashboard_Matrix_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.href = URL.createObjectURL(blob);
+    link.download = `Matrix_${title.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
-    // Nach: link.click();
+
     showFancyAlert('Matrix CSV Export erfolgreich!', 'success');
 }
 // ──────────────────────────────────────────────────────────────
@@ -1596,7 +1470,7 @@ async function exportMatrixPDF() {
         const levelColWidth = (usableWidth - compColWidth) / 5;
         let currentY = topMargin;
 
-        // Titel
+        // Filter-Infos
         const subjectFilter = document.getElementById('filterSubject')?.value?.trim() || '';
         const gradeFilter = document.getElementById('filterGrade')?.value?.trim() || '';
         const toolFilter = document.getElementById('filterTool')?.value?.trim().toLowerCase() || '';
@@ -1604,6 +1478,8 @@ async function exportMatrixPDF() {
         const gradeText = gradeFilter ? gradeFilter : 'Alle Klassen';
         const toolText = toolFilter ? ` | Tool: ${toolFilter}` : '';
         const title = `${subjectText} | ${gradeText}${toolText}`;
+
+        // Titel
         doc.setFontSize(16);
         doc.setTextColor(107, 70, 193);
         doc.setFont('helvetica', 'bold');
@@ -1619,7 +1495,6 @@ async function exportMatrixPDF() {
         doc.text(`Export: ${new Date().toLocaleDateString('de-DE')}`, pageWidth - rightMargin, currentY - 8, { align: 'right' });
         currentY += 5;
 
-        // Daten aufbauen
         const competences = [
             "Suchen, Verarbeiten und Aufbewahren",
             "Kommunizieren und Kooperieren",
@@ -1632,11 +1507,14 @@ async function exportMatrixPDF() {
         const levelColors = [
             [76,175,80],[139,195,74],[255,193,7],[255,152,0],[244,67,54]
         ];
+
+        // Matrix aufbauen
         const matrix = {};
         competences.forEach(c => {
             matrix[c] = {};
             levels.forEach(l => matrix[c][l] = []);
         });
+
         resources.forEach(r => {
             const s = r.subject?.trim();
             const g = r.grade?.trim();
@@ -1659,6 +1537,7 @@ async function exportMatrixPDF() {
             doc.setLineWidth(0.25);
             doc.line(x1,y1,x2,y2);
         };
+
         const drawHeader = y => {
             const h = 11;
             let x = leftMargin;
@@ -1684,6 +1563,7 @@ async function exportMatrixPDF() {
             doc.line(leftMargin, y+h, pageWidth-rightMargin, y+h);
             return y + h;
         };
+
         const drawCenteredText = (lines, x, y, w, h, lineH, bold=false) => {
             const totalH = lines.length * lineH;
             const startY = y + (h - totalH)/2 + lineH*0.7;
@@ -1691,15 +1571,16 @@ async function exportMatrixPDF() {
             doc.text(lines, x+4, startY);
         };
 
-        // Header zeichnen
+        // Header
         let headerBottom = drawHeader(currentY);
         currentY = headerBottom;
 
-        // Zeilen zeichnen
+        // Zeilen
         const COMP_FS = 9.5, LEVEL_FS = 8.0;
         const LH_COMP = COMP_FS * 1.2 * 0.3528;
         const LH_LEVEL = LEVEL_FS * 1.2 * 0.3528;
         const MIN_ROW_H = 16;
+
         competences.forEach(comp => {
             const compLines = doc.splitTextToSize(comp, compColWidth-8);
             const compH = compLines.length * LH_COMP;
@@ -1711,6 +1592,7 @@ async function exportMatrixPDF() {
                 if (h > maxLevelH) maxLevelH = h;
             });
             const rowH = Math.max(MIN_ROW_H, Math.max(compH, maxLevelH) + 8);
+
             if (currentY + rowH > pageHeight - 20) {
                 drawLine(leftMargin, headerBottom-3, leftMargin, currentY);
                 drawLine(pageWidth-rightMargin, headerBottom-3, pageWidth-rightMargin, currentY);
@@ -1723,6 +1605,7 @@ async function exportMatrixPDF() {
                 headerBottom = drawHeader(currentY);
                 currentY = headerBottom;
             }
+
             const rowY = currentY;
             let x = leftMargin;
             doc.setFillColor(248,249,255);
@@ -1732,6 +1615,7 @@ async function exportMatrixPDF() {
             drawCenteredText(compLines, x, rowY, compColWidth, rowH, LH_COMP, true);
             drawLine(x+compColWidth, rowY, x+compColWidth, rowY+rowH);
             x += compColWidth;
+
             levels.forEach((lvl, j) => {
                 const raw = matrix[comp][lvl].length ? matrix[comp][lvl].join('\n\n') : '—';
                 const lines = doc.splitTextToSize(raw, levelColWidth-8);
@@ -1747,7 +1631,7 @@ async function exportMatrixPDF() {
             currentY += rowH;
         });
 
-        // Abschlusslinien
+        // Abschluss
         drawLine(leftMargin, headerBottom-3, leftMargin, currentY);
         drawLine(pageWidth-rightMargin, headerBottom-3, pageWidth-rightMargin, currentY);
         const totalPages = doc.getNumberOfPages();
@@ -1765,6 +1649,7 @@ async function exportMatrixPDF() {
         showAlert('Fehler beim Erstellen der PDF. Bitte Seite neu laden und erneut versuchen.');
     }
 }
+
 function exportMatrixExcel() {
     const filtered = getFilteredResources();
     if (filtered.length === 0) {
@@ -1914,7 +1799,6 @@ function base64ToBlob(b64Data, contentType = '', sliceSize = 512) {
     }
     return new Blob(byteArrays, { type: contentType });
 }
-
 // === BACKUP MIT MODAL + AUTOMATISCHER DOWNLOAD ===
 function autoBackup() {
     const allResources = JSON.parse(localStorage.getItem('resources') || '[]');
@@ -2028,6 +1912,10 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function showAlert(msg) {
+    alert(msg);
 }
 
 function printOptimized() {
@@ -2193,6 +2081,30 @@ function printOptimized() {
     setTimeout(() => {
         mainContainer.innerHTML = originalMain;
     }, 500);
+}
+
+function parseCSVLine(line) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+                current += '"';
+                i++;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (char === ',' && !inQuotes) {
+            result.push(current);
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    result.push(current);
+    return result;
 }
 
 // === CSV IMPORT – 100% SICHER & MIT DEBUG ===
@@ -2409,134 +2321,96 @@ window.addEventListener('load', () => {
     }, 1000);
 });
 
-// === GLOBALE VARIABLEN ===
-let newWorker = null;
+function displayResources(list) {
+    const c = document.getElementById('resourcesList');
+    if (!c) return;
+    c.innerHTML = '';
+    list.forEach((r, i) => {
+        // SICHERER INDEX: Vergleich aller Felder
+        const realIndex = resources.findIndex(res => 
+            res.topic === r.topic && 
+            res.subject === r.subject && 
+            res.grade === r.grade && 
+            res.competence === r.competence &&
+            (res.tool || '') === (r.tool || '') &&
+            (res.description || '') === (r.description || '')
+        );
 
-let targetVersion = null;  // NEU: Ziel-Version speichern
+        const d = document.createElement('div');
+        d.className = 'resource-item';
+        d.dataset.index = realIndex >= 0 ? realIndex : i; // Fallback
 
-// NEU: Empfange Version vom Service-Worker
-navigator.serviceWorker.addEventListener('message', event => {
-  if (event.data?.type === 'NEW_VERSION') {
-    targetVersion = event.data.version;
-  }
-});
-
-// === EINZIGES UPDATE-BANNER ===
-function showUpdateReady() {
-  if (document.getElementById('updateBanner')) return;
-
-  const currentVersion = VERSION; // Direkt aus Konstante
-  const newVersion = targetVersion || 'neu';
-
-  const banner = document.createElement('div');
-  banner.id = 'updateBanner';
-  banner.innerHTML = `
-    <div style="background: linear-gradient(135deg, #27ae60, #2ecc71); color: white; padding: 16px 24px; border-radius: 16px; box-shadow: 0 8px 32px rgba(46,204,113,0.4); display: flex; align-items: center; gap: 14px; font-size: 15px; font-weight: 600; max-width: 380px; animation: slideIn 0.5s ease;">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-      </svg>
-      <div>
-        <strong>Update verfügbar!</strong><br>
-        <span style="font-size: 13px;">${currentVersion} → <strong>${newVersion}</strong></span>
-      </div>
-      <button id="installNow" style="background: white; color: #27ae60; border: none; border-radius: 10px; padding: 8px 16px; font-weight: 600; cursor: pointer;">Jetzt installieren</button>
-      <button id="closeBanner" style="background: none; border: none; color: white; font-size: 20px; cursor: pointer; margin-left: 8px;">×</button>
-    </div>
-  `;
-
-  document.body.appendChild(banner);
-
-  // === INSTALLIEREN ===
-  banner.querySelector('#installNow').onclick = () => {
-    if (!newWorker) {
-      console.warn('Kein neuer Worker verfügbar');
-      return;
-    }
-    banner.style.opacity = '0';
-    banner.style.transition = 'opacity 0.3s ease';
-    setTimeout(() => banner.remove(), 300);
-
-    newWorker.postMessage({ action: 'skipWaiting' });
-  };
-
-  // === SCHLIESSEN ===
-  banner.querySelector('#closeBanner').onclick = () => {
-    banner.remove();
-  };
-
-  // === AUTO-SCHLIESSEN ===
-  setTimeout(() => {
-    const b = document.getElementById('updateBanner');
-    if (b) b.remove();
-  }, 15000);
-}
-
-// === ANIMATION FÜR BANNER (einmalig) ===
-if (!document.getElementById('app-animations')) {
-  const style = document.createElement('style');
-  style.id = 'app-animations';
-  style.textContent = `
-    @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-  `;
-  document.head.appendChild(style);
-}
-
-// === SERVICE WORKER REGISTRIERUNG ===
-const swUrl = `service-worker.js?v=${VERSION}`;
-let deferredPrompt; // Für PWA-Install
-
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register(swUrl).then(reg => {
-    console.log('SW registriert mit Version:', VERSION);
-
-    // Update gefunden?
-    reg.addEventListener('updatefound', () => {
-      const installingWorker = reg.installing;
-      if (installingWorker) {
-        installingWorker.addEventListener('statechange', () => {
-          if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            newWorker = installingWorker;
-            showUpdateReady(); // Zeige Banner
-          }
-        });
-      }
+        d.innerHTML = `
+            <div class="resource-content">
+                <strong>${r.topic}</strong>
+                <span class="tag subject-tag" onclick="setFilterAndApply('filterSubject', '${escapeJs(r.subject)}')">${r.subject}</span>
+                <span class="tag grade-tag" onclick="setFilterAndApply('filterGrade', '${escapeJs(r.grade)}')">${r.grade}</span>
+                <span class="tag competence-tag" onclick="setFilterAndApply('filterCompetence', '${escapeJs(r.competence)}')">${r.competence}</span>
+                <span class="tag level-tag">${r.level || '—'}</span>
+               ${r.tool ? `<span class="tag tool-tag" onclick="setFilterAndApply('filterTool', '${escapeJs(r.tool.toLowerCase())}')">${escapeJs(r.tool)}</span>` : ''}
+                ${r.description ? `<div class="description">${r.description}</div>` : ''}
+                ${r.lastModified ? `<div style="font-size:11px; color:#888; margin-top:6px;">Zuletzt: ${r.lastModified}</div>` : ''}
+            </div>
+            <div class="action-icons">
+                <div class="action-icon favorite-icon ${r.favorite ? 'active' : ''}"
+                     onclick="toggleFavorite(${realIndex})">
+                    <svg><use xlink:href="#star-icon"/></svg>
+                </div>
+                <div class="action-icon edit-icon"
+                     onclick="editResource(${realIndex})">
+                    <svg><use xlink:href="#edit-icon"/></svg>
+                </div>
+                <div class="action-icon delete-icon"
+                     onclick="deleteResource(${realIndex})">
+                    <svg><use xlink:href="#delete-icon"/></svg>
+                </div>
+            </div>`;
+        c.appendChild(d);
     });
-
-    // Sofort prüfen
-    reg.update().catch(err => console.error('Update-Prüfung fehlgeschlagen:', err));
-  }).catch(err => {
-    console.error('SW Registrierung fehlgeschlagen:', err);
-    showFancyAlert('Service Worker Fehler', 'warning', 'Updates könnten nicht funktionieren.');
-  });
-
-  // Bei Controller-Wechsel: Seite neu laden
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    window.location.reload();
-  });
 }
 
-// PWA-Install-Prompt (zusätzlich zur Update-Logik)
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  // Optional: Zeige ein separates Banner für PWA-Installation
-  // showInstallBanner(); // Implementiere bei Bedarf
-});
+function toggleFavorite(i) {
+    if (i >= 0 && i < resources.length) {
+        resources[i].favorite = !resources[i].favorite;
+        localStorage.setItem('resources', JSON.stringify(resources));
+        applyFilters();
+    }
+}
 
-// Optional: Button für PWA-Install (füge in HTML hinzu, z.B. <button id="installPWA">App installieren</button>)
-document.getElementById('installPWA')?.addEventListener('click', async () => {
-  if (deferredPrompt) {
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') console.log('PWA installiert');
-    deferredPrompt = null;
-  }
-});
+function deleteResource(i) {
+    if (i >= 0 && i < resources.length) {
+        resources.splice(i, 1);
+        localStorage.setItem('resources', JSON.stringify(resources));
+        const anim = document.getElementById('deleteAnimation');
+        anim.classList.add('delete-active');
+        setTimeout(() => anim.classList.remove('delete-active'), 1200);
+        applyFilters();
+    }
+}
 
- </script>  <!-- ← ENDE SCRIPT -->
+    // === BEARBEITEN ===
+    function editResource(i) {
+        const r = resources[i];
+        const data = encodeURIComponent(JSON.stringify(r));
+        const url = `edit-resource.html?index=${i}&data=${data}`;
+        const popup = window.open(url, 'editResource', 'width=680,height=760,resizable=yes,scrollbars=yes');
+        if (popup) {
+            popup.focus();
+        } else {
+            alert('Popup wurde blockiert – bitte erlauben!');
+        }
+    }
+
+    function openNewResourceWindow() {
+    const popup = window.open('new-resource.html', 'newResource', 'width=680,height=760,resizable=yes,scrollbars=yes');
+    if (popup) {
+        popup.focus();
+    } else {
+        alert('Popup wurde blockiert – bitte erlauben!');
+    }
+}
+
+</script>  <!-- ← ENDE SCRIPT -->
 
      <!-- Version-Info -->
     <div class="version-info" id="versionInfo">Lade Version...</div>
@@ -2571,7 +2445,12 @@ document.getElementById('installPWA')?.addEventListener('click', async () => {
         </div>
     </div>
 
+
     <style>
+        @keyframes slideUp {
+  from { transform: translateX(-50%) translateY(100px); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
         @keyframes draw { to { stroke-dashoffset: 0; } }
         .delete-active { display: flex !important; }
         .delete-active > div { transform: scale(1) !important; opacity: 1 !important; }
