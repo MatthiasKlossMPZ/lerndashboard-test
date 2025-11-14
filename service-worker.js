@@ -1,6 +1,6 @@
 // service-worker.js
 const REPO_PATH = 'https://matthiasklossmpz.github.io/lerndashboard-test/';
-const VERSION = '1.5.3.9';
+const VERSION = '1.5.3.10';
 const CACHE_NAME = `lerndashboard-v${VERSION.replace(/\./g, '')}`;
 
 const urlsToCache = [
