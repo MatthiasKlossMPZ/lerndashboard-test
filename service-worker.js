@@ -1,5 +1,5 @@
 // service-worker.js
-const VERSION = '1.5.3.41';  // Erhöhe bei jedem Update!
+const VERSION = '1.5.3.50';  // Erhöhe bei jedem Update!
 const CACHE_NAME = `lerndashboard-v${VERSION.replace(/\./g, '')}`;
 const REPO_PATH = 'https://matthiasklossmpz.github.io/lerndashboard-test/';
 
@@ -55,12 +55,8 @@ self.addEventListener('activate', event => {
           .filter(k => k.startsWith('lerndashboard-v') && k !== CACHE_NAME)
           .map(k => caches.delete(k))
       )
-    ).then(() => self.clients.claim())
-     .then(() => {
-       return self.clients.matchAll().then(clients =>
-         clients.forEach(client => client.postMessage({ type: 'NEW_VERSION', version: VERSION }))
-       );
-     })
+    )
+    .then(() => self.clients.claim())
   );
 });
 

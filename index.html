@@ -823,7 +823,8 @@
 
 <script>
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-const VERSION = '1.5.3.41';
+let updateBannerShown = false;
+const VERSION = '1.5.3.50';
 const REPO_PATH = (
   location.hostname === 'localhost' ||
   location.hostname === '127.0.0.1' ||
@@ -1196,79 +1197,55 @@ function showPWAInstallBanner() {
     deferredPrompt = null;
   };
 
-  setTimeout(() => {
-    if (banner && banner.style.display !== 'none') {
-      banner.style.display = 'none';
-      deferredPrompt = null;
-    }
-  }, 20000);
-}
-
 // === PWA UPDATE LOGIK ===
 let newWorker;
 
-function showUpdateUI() {
-  // Verhindere doppeltes Anzeigen
-  if (document.getElementById('updateBanner')) return;
+function showUpdateBanner() {
+  // VERHINDERE DOPPELTE ANZEIGE
+  if (updateBannerShown || document.getElementById('updateBanner')) return;
+  updateBannerShown = true; // ← WICHTIG!
 
   const banner = document.createElement('div');
   banner.id = 'updateBanner';
   banner.style.cssText = `
-    position: fixed;
-    top: env(safe-area-inset-top, 0px); /* Sicherer Abstand zur Notch */
-    left: 0; right: 0;
-    background: #6b46c1;
-    color: white;
-    padding: 16px 20px;
-    text-align: center;
-    z-index: 9999;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    align-items: center;
-    animation: slideDown 0.5s ease;
+    position: fixed; top: 0; left: 0; right: 0;
+    background: linear-gradient(135deg, #6b46c1, #8e67d6);
+    color: white; padding: 18px 20px; text-align: center;
+    z-index: 999999; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.25); display: flex; flex-direction: column;
+    gap: 10px; align-items: center; animation: slideInDown 0.5s ease forwards;
     transform: translateY(-100%);
+    padding-top: calc(18px + env(safe-area-inset-top, 0px));
+    padding-bottom: max(18px, env(safe-area-inset-bottom, 18px));
   `;
 
   banner.innerHTML = `
-    <div style="font-weight: 600; font-size: 16px;">
-      Neue Version verfügbar!
+    <div style="font-weight: 700; font-size: 16px;">Neue Version verfügbar!</div>
+    <div style="font-size: 14px; opacity: 0.9; max-width: 90%;">
+      Tippe auf „Aktualisieren“, um die neuesten Funktionen zu erhalten.
     </div>
-    <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
-      <button id="updateNowBtn" style="
-        background: white; color: #6b46c1; border: none;
-        padding: 10px 24px; border-radius: 12px;
-        font-weight: 700; cursor: pointer; font-size: 15px;
-        min-width: 140px;
-      ">Jetzt aktualisieren</button>
-    </div>
+    <button id="updateNowBtn" style="
+      background: white; color: #6b46c1; border: none; padding: 12px 32px;
+      border-radius: 14px; font-weight: 700; font-size: 15px; cursor: pointer;
+      min-width: 160px; box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+    ">Aktualisieren</button>
   `;
 
-  // Animation: Einblenden
   document.body.appendChild(banner);
-  requestAnimationFrame(() => {
-    banner.style.transform = 'translateY(0)';
-  });
+  requestAnimationFrame(() => banner.style.transform = 'translateY(0)');
 
-  // === NUR Aktualisieren schließt das Banner ===
   document.getElementById('updateNowBtn').onclick = () => {
     if (navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({ type: 'SKIP_WAITING' });
     }
-    // Banner ausblenden
     banner.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
     banner.style.transform = 'translateY(-100%)';
     banner.style.opacity = '0';
     setTimeout(() => {
-      if (banner.parentNode) banner.remove();
+      banner.remove();
       window.location.reload();
     }, 400);
   };
-
-  // === KEIN Schließen per × mehr! ===
-  // → Banner bleibt, bis aktualisiert wird
 }
 
 // === SERVICE WORKER REGISTRIERUNG ===
@@ -1282,32 +1259,19 @@ if ('serviceWorker' in navigator) {
         // === UPDATE-LOGIK HIER ===
         let updateReady = false;
 
-        reg.addEventListener('updatefound', () => {
-          const newWorker = reg.installing;
-          if (!newWorker) return;
+       reg.addEventListener('updatefound', () => {
+  const newWorker = reg.installing;
+  if (!newWorker) return;
 
-          newWorker.addEventListener('statechange', () => {
-            if (
-              newWorker.state === 'installed' &&
-              navigator.serviceWorker.controller &&
-              !updateReady
-            ) {
-              updateReady = true;
-              showUpdateUI(); // Banner erscheint und bleibt!
-            }
-          });
-        });
+  newWorker.addEventListener('statechange', () => {
+    if (newWorker.state === 'installed') {
+      showUpdateBanner(); // ← Egal ob controller vorhanden oder nicht!
+    }
+  });
+});
         // =========================
       })
       .catch(err => console.error('SW Fehler:', err));
-  });
-
-  // === VERSION ANZEIGEN ===
-  navigator.serviceWorker.addEventListener('message', event => {
-    if (event.data?.type === 'NEW_VERSION') {
-      const info = document.getElementById('versionInfo');
-      if (info) info.textContent = `v${event.data.version}`;
-    }
   });
 
   // === RELOAD NACH SKIP_WAITING ===
@@ -1315,6 +1279,7 @@ if ('serviceWorker' in navigator) {
     console.log('Neuer SW übernimmt – Seite wird neu geladen');
     setTimeout(() => window.location.reload(), 100);
   });
+}
 }
 
 // === PWA INSTALLATION ===
@@ -2591,6 +2556,11 @@ function deleteResource(i) {
         to { transform: translateY(0); opacity: 1; }
         }
 
+        @keyframes slideInDown {
+        from { transform: translateY(-100%); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+        }
+
         @keyframes draw { to { stroke-dashoffset: 0; } }
         .delete-active { display: flex !important; }
         .delete-active > div { transform: scale(1) !important; opacity: 1 !important; }
@@ -2920,4 +2890,4 @@ tr:last-child td {
 </div>
 
 </body>
-</html> 
+</html>
