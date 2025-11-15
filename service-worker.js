@@ -1,4 +1,4 @@
-const VERSION = '1.5.3.88'; // Erhöhe bei jedem Update!
+const VERSION = '1.5.3.89'; // Erhöhe bei jedem Update!
 const CACHE_NAME = `lerndashboard-v${VERSION.replace(/\./g, '')}`;
 
 // === DYNAMISCHER PFAD ===
