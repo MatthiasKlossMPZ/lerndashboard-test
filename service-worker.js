@@ -1,8 +1,17 @@
-// service-worker.js
-const VERSION = '1.5.3.85';  // Erhöhe bei jedem Update!
+const VERSION = '1.5.3.88'; // Erhöhe bei jedem Update!
 const CACHE_NAME = `lerndashboard-v${VERSION.replace(/\./g, '')}`;
-const REPO_PATH = 'https://matthiasklossmpz.github.io/lerndashboard-test/';
 
+// === DYNAMISCHER PFAD ===
+const REPO_PATH = (() => {
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return '/';
+  const path = location.pathname;
+  if (path.includes('/lerndashboard-test/')) {
+    return 'https://matthiasklossmpz.github.io/lerndashboard-test/';
+  }
+  return location.origin + path.split('/').slice(0, -1).join('/') + '/';
+})();
+
+// === URLS ZUM CACHEN (relativ zu REPO_PATH) ===
 const urlsToCache = [
   './',
   'index.html',
@@ -18,7 +27,7 @@ const urlsToCache = [
   'libs/jszip.min.js',
   'libs/exceljs.min.js',
   'libs/FileSaver.min.js'
-];
+].map(url => new URL(url, REPO_PATH).href);
 
 // === skipWaiting ===
 self.addEventListener('message', event => {
