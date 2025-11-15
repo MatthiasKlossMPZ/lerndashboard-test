@@ -1503,6 +1503,11 @@ function exportPDF() {
     }
 }
 
+// === HELPER: Sauberes Datum für Dateinamen ===
+function getDateString() {
+    return new Date().toISOString().slice(0, 10); // → "2025-11-15"
+}
+
 function exportMatrixCSV() {
     const filtered = getFilteredResources();
     if (filtered.length === 0) {
@@ -1510,14 +1515,21 @@ function exportMatrixCSV() {
         return;
     }
 
-    const subjectFilter = document.getElementById('filterSubject')?.value?.trim() || '';
-    const gradeFilter = document.getElementById('filterGrade')?.value?.trim() || '';
-    const toolFilter = document.getElementById('filterTool')?.value?.trim().toLowerCase() || '';
+    // === FILTER-INFO (für Inhalt) ===
+    updateCurrentFilters();
 
-    const subjectText = subjectFilter || 'Alle Fächer';
-    const gradeText = gradeFilter || 'Alle Klassen';
-    const toolText = toolFilter ? ` | Tool: ${toolFilter}` : '';
-    const title = `${subjectText} | ${gradeText}${toolText}`;
+    let filterParts = [];
+    if (currentFilters.subject) filterParts.push(currentFilters.subject);
+    if (currentFilters.grade) filterParts.push(currentFilters.grade);
+    if (currentFilters.level) filterParts.push(currentFilters.level);
+    if (currentFilters.competence) {
+        const kb = currentFilters.competence.match(/(\d+)$/);
+        filterParts.push(kb ? `KB ${kb[1]}` : currentFilters.competence);
+    }
+    if (currentFilters.tool) filterParts.push(`Tool: ${currentFilters.tool}`);
+
+    const documentTitle = filterParts.length > 0 ? filterParts.join(' | ') : 'Kompetenzmatrix';
+    const fileTitle = `Matrix_${getDateString()}`;  // ← Nur Datum!
 
     const competences = [
         "Suchen, Verarbeiten und Aufbewahren",
@@ -1527,73 +1539,62 @@ function exportMatrixCSV() {
         "Problemlösen und Handeln",
         "Analysieren und Reflektieren"
     ];
-
     const levels = ["Niveaustufe 1", "Niveaustufe 2", "Niveaustufe 3", "Niveaustufe 4", "Niveaustufe 5"];
 
+    // === MATRIX AUFBAUEN (mit Set für Duplikate) ===
     const matrix = {};
     competences.forEach(c => {
         matrix[c] = {};
         levels.forEach(l => matrix[c][l] = new Set());
     });
 
-    // DEBUG: Zeig an, welche Daten verarbeitet werden
-    console.log("Verarbeite Ressourcen:", filtered.map(r => ({
-        topic: r.topic,
-        competence: r.competence,
-        level: r.level,
-        grade: r.grade,
-        tool: r.tool
-    })));
-
     filtered.forEach(r => {
-        // NORMALISIERE: trim + exakter String
         const comp = (r.competence || '').trim();
         const level = (r.level || '').trim();
         const topic = (r.topic || '').trim();
+        const grade = (r.grade || '').trim();
         const tool = (r.tool || '').trim();
 
-        // Prüfe, ob comp und level in den Listen VORHANDEN sind
-        if (!competences.includes(comp)) {
-            console.warn("Kompetenz nicht erkannt:", comp, "(verfügbar:", competences, ")");
-            return;
-        }
-        if (!levels.includes(level)) {
-            console.warn("Niveaustufe nicht erkannt:", level, "(verfügbar:", levels, ")");
-            return;
-        }
-        if (!topic) return;
+        if (!comp || !level || !topic) return;
+        if (!competences.includes(comp)) return;
+        if (!levels.includes(level)) return;
 
-        const entry = `${topic} (${r.grade}${tool ? ` – ${tool}` : ''})`;
+        const entry = `${topic} (${grade}${tool ? ` – ${tool}` : ''})`;
         matrix[comp][level].add(entry);
     });
 
-    // DEBUG: Zeig Matrix an
-    console.log("Matrix-Inhalt:", matrix);
+    // === CSV AUFBAUEN ===
+    let csv = '\uFEFF';  // BOM für UTF-8
+    csv += `"${documentTitle}"\n\n`;  // Titelzeile (mit Filtern)
 
-    let csv = '\uFEFF"Titel: ${title}"\n\n';
+    // Header
     csv += '"Kompetenz";' + levels.map(l => `"${l}"`).join(';') + '\n';
 
+    // Daten
     competences.forEach(comp => {
         const row = [`"${comp}"`];
         levels.forEach(level => {
             const entries = [...matrix[comp][level]];
             const cell = entries.length > 0 ? entries.join('\n') : '—';
-            row.push(`"${cell}"`);
+            row.push(`"${cell.replace(/"/g, '""')}"`);  // Escaping von "
         });
         csv += row.join(';') + '\n';
     });
 
+    // === DOWNLOAD ===
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `Matrix_${title.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `${fileTitle}.csv`;  // ← Nur Matrix_2025-11-15.csv
     link.click();
 
     showFancyAlert('Matrix CSV Export erfolgreich!', 'success');
 }
+
 // ──────────────────────────────────────────────────────────────
 // MATRIX → PDF
 // ──────────────────────────────────────────────────────────────
+
 async function exportMatrixPDF() {
     const filtered = getFilteredResources();
     if (filtered.length === 0) {
@@ -1614,8 +1615,8 @@ async function exportMatrixPDF() {
         const levelColWidth = (usableWidth - compColWidth) / 5;
         let currentY = topMargin;
 
-        // === FILTER-INFO (wie in Excel) ===
-        updateCurrentFilters();  // ← Nutzt globale currentFilters
+        // === FILTER-INFO (für Inhalt) ===
+        updateCurrentFilters();
 
         let filterParts = [];
         if (currentFilters.subject) filterParts.push(currentFilters.subject);
@@ -1627,26 +1628,27 @@ async function exportMatrixPDF() {
         }
         if (currentFilters.tool) filterParts.push(`Tool: ${currentFilters.tool}`);
 
-        const title = filterParts.length > 0 ? filterParts.join(' | ') : 'Kompetenzmatrix';
+        const documentTitle = filterParts.length > 0 ? filterParts.join(' | ') : 'Kompetenzmatrix';
+        const fileTitle = `Matrix_${getDateString()}`;  // ← Nur Datum!
 
-        // === ÜBERSCHRIFT (kleiner, mehrzeilig, kein Überlappen) ===
-        doc.setFontSize(13);  // ← von 16 → 13
+        // === ÜBERSCHRIFT (kleiner, mehrzeilig) ===
+        doc.setFontSize(13);
         doc.setTextColor(107, 70, 193);
         doc.setFont('helvetica', 'bold');
 
         const maxTitleWidth = pageWidth - leftMargin - rightMargin - 20;
-        const titleLines = doc.splitTextToSize(title, maxTitleWidth);
+        const titleLines = doc.splitTextToSize(documentTitle, maxTitleWidth);
         doc.text(titleLines, pageWidth / 2, currentY, { align: 'center' });
-        currentY += titleLines.length * 5.5;  // ← Zeilenhöhe
+        currentY += titleLines.length * 5.5;
 
-        // === SCHULNAME & DATUM (nach Überschrift) ===
+        // === SCHULNAME & DATUM ===
         doc.setFontSize(10);
         doc.setTextColor(100);
         doc.setFont('helvetica', 'italic');
         const schoolName = localStorage.getItem('schoolName') || 'Deine Schule';
         doc.text(schoolName, leftMargin, currentY);
         doc.text(`Export: ${new Date().toLocaleDateString('de-DE')}`, pageWidth - rightMargin, currentY, { align: 'right' });
-        currentY += 8;  // ← mehr Abstand
+        currentY += 8;
 
         // === DATEN ===
         const competences = [
@@ -1662,7 +1664,7 @@ async function exportMatrixPDF() {
             [76, 175, 80], [139, 195, 74], [255, 193, 7], [255, 152, 0], [244, 67, 54]
         ];
 
-        // === MATRIX AUFBAUEN ===
+        // === MATRIX ===
         const matrix = {};
         competences.forEach(c => {
             matrix[c] = {};
@@ -1807,7 +1809,8 @@ async function exportMatrixPDF() {
             doc.text(`Seite ${i}`, pageWidth - rightMargin, pageHeight - 8, { align: 'right' });
         }
 
-        doc.save(`LernDashboard_Matrix_${new Date().toISOString().slice(0, 10)}.pdf`);
+        // === SAVE MIT SAUBEREM DATEINAMEN ===
+        doc.save(`${fileTitle}.pdf`);
         showFancyAlert('PDF erfolgreich erstellt!', 'success');
 
     } catch (err) {
@@ -1844,7 +1847,7 @@ function exportMatrixExcel() {
     const headerColor = 'FF6B46C1';
     const contentColor = 'FFF8F9FA';
 
-    // === FILTER-INFO (global, kein redeclare!) ===
+    // === FILTER-INFO (für Inhalt) ===
     updateCurrentFilters();
 
     let filterParts = [];
@@ -1857,7 +1860,8 @@ function exportMatrixExcel() {
     }
     if (currentFilters.tool) filterParts.push(`Tool: ${currentFilters.tool}`);
 
-    const filterText = filterParts.length > 0 ? filterParts.join(' | ') : 'Kompetenzmatrix';
+    const documentTitle = filterParts.length > 0 ? filterParts.join(' | ') : 'Kompetenzmatrix';
+    const fileTitle = `Matrix_${getDateString()}`;  // ← Nur Datum!
 
     // === SCHULNAME & DATUM ===
     const schoolName = localStorage.getItem('schoolName') || 'Deine Schule';
@@ -1892,9 +1896,9 @@ function exportMatrixExcel() {
 
     sheet.mergeCells('B1:E1');
     const filterCell = sheet.getCell('B1');
-    filterCell.value = filterText;
+    filterCell.value = documentTitle;  // ← Inhalt: Filter
     filterCell.font = { bold: true, size: 12, color: { argb: headerColor } };
-    filterCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };  // ← wrapText!
+    filterCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
     filterCell.border = { top: { style: 'thin', color: { argb: 'FFCCCCCC' } }, left: { style: 'thin', color: { argb: 'FFCCCCCC' } }, bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } }, right: { style: 'thin', color: { argb: 'FFCCCCCC' } } };
 
     const dateCell = headerTopRow.getCell(6);
@@ -1948,10 +1952,10 @@ function exportMatrixExcel() {
 
     sheet.columns = [{ width: 36 }, { width: 44 }, { width: 44 }, { width: 44 }, { width: 44 }, { width: 44 }];
 
-    // === EXPORT ===
+    // === EXPORT MIT SAUBEREM DATEINAMEN ===
     workbook.xlsx.writeBuffer().then(buffer => {
         const excelBlob = new Blob([buffer], { type: 'application/octet-stream' });
-        saveAs(excelBlob, `Kompetenzmatrix_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        saveAs(excelBlob, `${fileTitle}.xlsx`);  // ← Nur Matrix_2025-11-15
         showFancyAlert('Excel-Matrix erfolgreich erstellt!', 'success');
     }).catch(err => {
         console.error("Export-Fehler:", err);
