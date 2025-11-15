@@ -841,7 +841,7 @@ function updateCurrentFilters() {
 }
 
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-const VERSION = '1.5.3.83';
+const VERSION = '1.5.3.84';
 const REPO_PATH = (
   location.hostname === 'localhost' ||
   location.hostname === '127.0.0.1' ||
@@ -880,19 +880,44 @@ function getSchoolName() {
     return localStorage.getItem('schoolName');
 }
 
+// === SCHULBUTTON DAUERHAFT AKTUALISIEREN ===
 function updateSchoolButton() {
+    const btnText = document.getElementById('schoolButtonText');
     const btn = document.getElementById('schoolButton');
-    if (!btn) return;
-    const name = getSchoolName();
+    if (!btnText || !btn) return;
+
+    const name = localStorage.getItem('schoolName') || '';
     if (name) {
-        btn.textContent = name;
+        btnText.textContent = name;
         btn.title = 'Schulname ändern';
         btn.dataset.set = 'true';
     } else {
-        btn.textContent = 'Schule einstellen';
+        btnText.textContent = 'Schule einstellen';
         btn.title = 'Schulname festlegen';
         btn.dataset.set = 'false';
     }
+}
+
+// Beim Laden
+document.addEventListener('DOMContentLoaded', updateSchoolButton);
+
+// Nach Änderung im Modal
+function setSchoolName() {
+    const current = localStorage.getItem('schoolName') || '';
+    // ... dein bestehender Modal-Code ...
+
+    // Am Ende des "Speichern"-Buttons:
+    modal.querySelector('#saveSchoolBtn').onclick = () => {
+        const name = input.value.trim();
+        if (name) {
+            localStorage.setItem('schoolName', name);
+        } else {
+            localStorage.removeItem('schoolName');
+        }
+        updateSchoolButton();  // ← HIER AKTUALISIEREN
+        document.getElementById('printSchoolNameText').textContent = getSchoolName() || 'Deine Schule';
+        // ... Modal schließen ...
+    };
 }
 
 
