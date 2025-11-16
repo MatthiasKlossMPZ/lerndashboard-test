@@ -841,12 +841,17 @@ function updateCurrentFilters() {
 }
 
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-const VERSION = '1.5.3.91';
-const REPO_PATH = (
-  location.hostname === 'localhost' ||
-  location.hostname === '127.0.0.1' ||
-  location.protocol === 'file:'
-) ? '/' : 'https://matthiasklossmpz.github.io/lerndashboard-test';
+const VERSION = '1.5.3.92';
+const REPO_PATH = (() => {
+  if (location.hostname === 'localhost' || 
+      location.hostname === '127.0.0.1' || 
+      location.protocol === 'file:') {
+    return '/';
+  }
+  const path = location.pathname.split('/').filter(Boolean);
+  return location.origin + '/' + (path[0] || '') + '/';  // ← Immer mit trailing '/'
+})();
+console.log('Frontend REPO_PATH:', REPO_PATH);  // Debug: Sollte /lerndashboard/ sein
 
 let resources = JSON.parse(localStorage.getItem('resources') || '[]');
 let tools = new Set(resources.map(r => r.tool?.trim().toLowerCase()).filter(Boolean));
@@ -1221,12 +1226,14 @@ window.addEventListener('message', function(event) {
 });
 
 // === PWA INSTALL BANNER ===
+
 function showPWAInstallBanner() {
   let banner = document.getElementById('pwaInstallBanner');
   if (banner) {
     banner.style.display = 'flex';
     return;
   }
+
   banner = document.createElement('div');
   banner.id = 'pwaInstallBanner';
   banner.style.cssText = `
@@ -1248,17 +1255,28 @@ function showPWAInstallBanner() {
   document.getElementById('installPwaBtn').onclick = async () => {
     banner.style.display = 'none';
     if (!deferredPrompt) return;
+
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     console.log('PWA Installation:', outcome);
-    deferredPrompt = null;
+
+    if (outcome === 'accepted') {
+      deferredPrompt = null;
+    }
   };
 
   document.getElementById('closePwaBanner').onclick = () => {
     banner.style.display = 'none';
-    deferredPrompt = null;
+    deferredPrompt = null; // Verhindert erneuten Aufruf
   };
-}  
+}
+
+// === PWA INSTALLATION ===
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  showPWAInstallBanner(); // ← JETZT WIRD ER ANGEZEIGT!
+});
 
 // === PWA UPDATE BANNER ===
 function showUpdateBanner() {
@@ -2518,7 +2536,7 @@ window.addEventListener('load', () => {
     // Warte kurz, bis SW aktiv ist
     setTimeout(() => {
         // LÖSE EINEN FETCH AUS (z. B. Bild laden)
-        fetch(`${REPO_PATH}icon-192.png?t=${Date.now()}`)
+        fetch(`${REPO_PATH}/icon-192.png?t=${Date.now()}`)
             .then(() => console.log('Fetch ausgelöst → PWA-Install bereit'))
             .catch(() => {});
     }, 1000);
