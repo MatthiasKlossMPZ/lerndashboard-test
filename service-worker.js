@@ -1,4 +1,4 @@
-const VERSION = '1.5.3.92'; // ← Erhöhe für Test (setze auf 1.0.9 nach Fix)
+const VERSION = '1.5.3.93'; // ← Erhöhe für Test (setze auf 1.0.9 nach Fix)
 const CACHE_NAME = `lerndashboard-v${VERSION.replace(/\./g, '')}`;
 
 // DYNAMISCHER PFAD – FIX: IMMER TRAILING SLASH!
