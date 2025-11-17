@@ -58,7 +58,7 @@ for (let i = 1; i <= 13; i++) {
 </select></div>
 <div class="form-group"><label>Niveaustufe *</label>
 <select id="level" required>
-<option value="">- Niveau auswählen -</option>
+<option value="">- Niveau wählen -</option>
 <option value="Niveaustufe 1">Niveaustufe 1</option>
 <option value="Niveaustufe 2">Niveaustufe 2</option>
 <option value="Niveaustufe 3">Niveaustufe 3</option>
@@ -90,21 +90,44 @@ function cancel() {
     window.close();
 }
 
-// === ROBUSTER VERSAND ANS HAUPTFENSTER (neu & wichtig!) ===
+// === ROBUSTER VERSAND ANS HAUPTFENSTER ===
 function sendToMainWindow(type, payload) {
-    // 1. Klassisch über opener (funktioniert meistens)
-    if (window.opener && !window.opener.closed) {
+    let sent = false;
+
+    // 1. Klassisch über opener
+    if (!sent && window.opener && !window.opener.closed) {
         window.opener.postMessage({ type, ...payload }, '*');
+        sent = true;
     }
-    // 2. Fallback: BroadcastChannel → funktioniert IMMER in derselben PWA
-    try {
-        const channel = new BroadcastChannel('lerndashboard-channel');
-        channel.postMessage({ type, ...payload });
-        channel.close();
-    } catch (e) {
-        console.warn('BroadcastChannel nicht verfügbar', e);
+
+    // 2. Nur als Fallback, falls opener nicht ging
+    if (!sent) {
+        try {
+            const channel = new BroadcastChannel('lerndashboard-channel');
+            channel.postMessage({ type, ...payload });
+            channel.close();
+            // sent bleibt false → nur BroadcastChannel lief
+        } catch (e) {
+            console.warn('BroadcastChannel nicht verfügbar', e);
+        }
     }
 }
+
+// === SPEICHERN ===
+document.getElementById('resourceForm').onsubmit = e => {
+    e.preventDefault();
+
+    if (!resource.topic || !resource.subject || !resource.grade || !resource.competence || !resource.level) {
+        alert('Bitte alle Pflichtfelder ausfüllen!');
+        return;
+    }
+
+    // Nur noch EINE Nachricht schicken
+    sendToMainWindow('ADD_RESOURCE', { data: resource });
+
+    // KEIN alert() mehr
+    window.close();
+};
 
 // === SPEICHERN (komplett überarbeitet) ===
 document.getElementById('resourceForm').onsubmit = e => {
