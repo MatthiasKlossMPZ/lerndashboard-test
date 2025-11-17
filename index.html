@@ -841,7 +841,7 @@ function updateCurrentFilters() {
 }
 
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-const VERSION = '1.6.1';
+const VERSION = '1.6.2';
 const REPO_PATH = (() => {
   if (location.hostname === 'localhost' || 
       location.hostname === '127.0.0.1' || 
@@ -1197,54 +1197,25 @@ function resetFilters() {
     applyFilters();
 }
 
-// === COPYRIGHT + VERSION SOFORT AKTUALISIEREN ===
+// === VERSION SOFORT UND NACH UPDATE ANZEIGEN ===
 function updateVersionDisplay() {
     const el = document.getElementById('versionInfo');
     if (el) {
         el.innerHTML = `© 2025 <strong>Matthias Kloß</strong> | Version ${VERSION}`;
     }
 }
-window.addEventListener('load', updateVersionDisplay);
-// Zusätzlich bei jedem SW-Update sofort aktualisieren
-navigator.serviceWorker?.addEventListener('controller2change', updateVersionDisplay);
 
-// === Alte postMessage + neue BroadcastChannel-Unterstützung ===
-function handleResourceMessage(event) {
-    if (!event.data) return;
-    // Unterstützung für deine alten Nachrichten (action: 'addResource')
-    if (event.data.action === 'addResource' && event.data.resource) {
-        event.data = { type: 'ADD_RESOURCE', data: event.data.resource };
+// Beim ersten Laden
+window.addEventListener('load', updateVersionDisplay);
+
+// WICHTIG: Nach jedem Service-Worker-Update sofort neu anzeigen (auch ohne Reload!)
+navigator.serviceWorker.addEventListener('controllerchange', () => {
+    console.log('SW gewechselt → Version sofort aktualisieren');
+    updateVersionDisplay();        // ← Das fehlte!
+    if (allowReload) {
+        window.location.reload();
     }
-    if (event.data.type === 'ADD_RESOURCE') {
-        const { data: newResource } = event.data;
-        if (newResource && newResource.topic) {
-            resources.push(newResource);
-            localStorage.setItem('resources', JSON.stringify(resources));
-            applyFilters();
-            updateToolFilter();
-            populateDropdowns();
-            const addAnim = document.getElementById('addAnimation');
-            if (addAnim) {
-                addAnim.classList.add('add-active');
-                setTimeout(() => addAnim.classList.remove('add-active'), 1200);
-            }
-            showFancyAlert('Ressource erfolgreich hinzugefügt!', 'success');
-        }
-    }
-    if (event.data.type === 'UPDATE_RESOURCE') {
-        const { index, data } = event.data;
-        if (index >= 0 && index < resources.length) {
-            resources[index] = data;
-            localStorage.setItem('resources', JSON.stringify(resources));
-            applyFilters();
-            const anim = document.getElementById('editAnimation');
-            if (anim) {
-                anim.classList.add('edit-active');
-                setTimeout(() => anim.classList.remove('edit-active'), 1200);
-            }
-        }
-    }
-}
+});
 // 1. Klassischer Listener
 window.addEventListener('message', handleResourceMessage);
 // 2. Fallback: BroadcastChannel (für installierte PWAs)
@@ -1263,7 +1234,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 });
 
 // === PWA UPDATE BANNER ===
-// === PWA UPDATE BANNER → Button fixen ===
+
 function showUpdateBanner() {
   if (updateBannerShown || document.getElementById('updateBanner')) return;
   updateBannerShown = true;

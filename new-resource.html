@@ -154,8 +154,7 @@ document.getElementById('resourceForm').onsubmit = e => {
     // WICHTIG: Neuer einheitlicher Typ + robustes Senden
     sendToMainWindow('ADD_RESOURCE', { data: resource });
 
-    // Feedback + schließen
-    alert('Ressource erfolgreich gespeichert!');
+    // alert('Ressource erfolgreich gespeichert!');
     window.close();
 };
 
