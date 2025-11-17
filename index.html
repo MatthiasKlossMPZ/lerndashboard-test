@@ -841,7 +841,7 @@ function updateCurrentFilters() {
 }
 
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-const VERSION = '1.6.4';
+const VERSION = '1.6.5';
 const REPO_PATH = (() => {
   if (location.hostname === 'localhost' || 
       location.hostname === '127.0.0.1' || 
@@ -1217,15 +1217,16 @@ navigator.serviceWorker.addEventListener('controllerchange', () => {
     }
 });
 
-// === Alte postMessage + neue BroadcastChannel-Unterstützung ===
+// === NACHRICHTEN-EMPFANG (postMessage + BroadcastChannel) – MUSS DRIN SEIN! ===
 function handleResourceMessage(event) {
     if (!event.data) return;
 
-    // Kompatibilität zu ganz alten Nachrichten
+    // Kompatibilität für ganz alte Versionen
     if (event.data.action === 'addResource' && event.data.resource) {
         event.data = { type: 'ADD_RESOURCE', data: event.data.resource };
     }
 
+    // === NEUE RESSOURCE ===
     if (event.data.type === 'ADD_RESOURCE') {
         const { data: newResource } = event.data;
         if (newResource && newResource.topic) {
@@ -1244,6 +1245,7 @@ function handleResourceMessage(event) {
         }
     }
 
+    // === UPDATE RESSOURCE ===
     if (event.data.type === 'UPDATE_RESOURCE') {
         const { index, data } = event.data;
         if (index >= 0 && index < resources.length) {

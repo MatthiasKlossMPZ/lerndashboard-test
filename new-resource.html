@@ -87,24 +87,43 @@ function cancel() {
 }
 
 // === Robuster Versand (funktioniert im Browser UND in installierter PWA) ===
+// === FINALER VERSAND – KEIN DOPPEL mehr, funktioniert überall! ===
 function sendToMainWindow(type, payload) {
-  // 1. postMessage versuchen
-  if (window.opener && !window.opener.closed) {
-    try {
-      window.opener.postMessage({ type, ...payload }, '*');
-    } catch (e) {
-      console.warn('postMessage fehlgeschlagen', e);
-    }
-  }
+    let sent = false;
 
-  // 2. Immer zusätzlich BroadcastChannel (wichtig für installierte PWAs!)
-  try {
-    const channel = new BroadcastChannel('lerndashboard-channel');
-    channel.postMessage({ type, ...payload });
-    channel.close();
-  } catch (e) {
-    console.warn('BroadcastChannel nicht verfügbar', e);
-  }
+    // 1. postMessage versuchen (funktioniert im normalen Browser-Fenster)
+    if (!sent && window.opener && !window.opener.closed) {
+        try {
+            window.opener.postMessage({ type, ...payload }, '*');
+            sent = true;                // ← Wenn postMessage ging → fertig
+            console.log('Gesendet via postMessage');
+        } catch (e) {
+            console.warn('postMessage fehlgeschlagen', e);
+        }
+    }
+
+    // 2. NUR als Fallback: BroadcastChannel (wichtig in installierter PWA)
+    if (!sent) {
+        try {
+            const channel = new BroadcastChannel('lerndashboard-channel');
+            channel.postMessage({ type, ...payload });
+            channel.close();
+            console.log('Gesendet via BroadcastChannel (Fallback)');
+        } catch (e) {
+            console.warn('BroadcastChannel nicht verfügbar', e);
+        }
+    }
+
+    // Kleine Bestätigung im Popup (kann später wieder raus)
+    setTimeout(() => {
+        if (document.body) {
+            const fb = document.createElement('div');
+            fb.textContent = 'Gespeichert!';
+            fb.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#27ae60;color:white;padding:8px 16px;border-radius:8px;font-weight:bold;z-index:10000;';
+            document.body.appendChild(fb);
+            setTimeout(() => fb.remove(), 1500);
+        }
+    }, 300);
 }
 
 // === Speichern (EINZIGER Handler!) ===
