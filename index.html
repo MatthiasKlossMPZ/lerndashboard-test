@@ -1359,9 +1359,9 @@ function showPWAInstallBanner() {
     }, 8000);
 }
 
-// Kleine Animationen fürs Banner
-const style = document.createElement('style');
-style.textContent = `
+// === PWA-INSTALLATIONS-BANNER: Animationen (kein Konflikt mehr!) ===
+const pwaBannerStyle = document.createElement('style');
+pwaBannerStyle.textContent = `
     @keyframes slideUp {
         from { transform: translateX(-50%) translateY(100px); opacity: 0; }
         to { transform: translateX(-50%) translateY(0); opacity: 1; }
@@ -1371,45 +1371,77 @@ style.textContent = `
         to { transform: translateX(-50%) translateY(100px); opacity: 0; }
     }
 `;
-document.head.appendChild(style);
+document.head.appendChild(pwaBannerStyle);
 
-// === PWA UPDATE BANNER ===
+// === PWA-INSTALLATIONS-BANNER ===
+function showPWAInstallBanner() {
+    // Nur einmal pro Tag zeigen
+    const lastShown = localStorage.getItem('pwaBannerLastShown');
+    const now = Date.now();
+    if (lastShown && (now - parseInt(lastShown)) < 86400000) return;
 
-function showUpdateBanner() {
-  if (updateBannerShown || document.getElementById('updateBanner')) return;
-  updateBannerShown = true;
+    const banner = document.createElement('div');
+    banner.id = 'pwaInstallBanner';
+    banner.style.cssText = `
+        position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+        background: white; color: #333; padding: 16px 28px; border-radius: 18px;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.35); z-index: 99999;
+        display: flex; align-items: center; gap: 16px; max-width: 90%;
+        font-family: system-ui, sans-serif; animation: slideUp 0.6s ease;
+        border: 4px solid #6b46c1;
+    `;
+    banner.innerHTML = `
+        <svg width="52" height="52" viewBox="0 0 24 24" fill="#6b46c1">
+            <path d="M17 18H7V6h10v1h2V3c0-1.1-.9-2-2-2H7c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-4h-2v1z"/>
+            <path d="M14 9h5l-7 7-7-7h5V3h4v6z"/>
+        </svg>
+        <div style="flex:1;">
+            <strong style="font-size:17px;display:block;margin-bottom:4px;">
+                LernDashboard als App installieren?
+            </strong>
+            <span style="font-size:14px;color:#555;">
+                Direkt vom Homescreen starten – schneller & offline nutzbar!
+            </span>
+        </div>
+        <button id="installPwaBtn" style="
+            background:#6b46c1;color:white;border:none;padding:12px 24px;
+            border-radius:12px;font-weight:700;cursor:pointer;font-size:15px;
+        ">Installieren</button>
+        <button id="closePwaBanner" style="
+            background:none;border:none;font-size:28px;cursor:pointer;color:#999;
+            margin-left:8px;
+        ">×</button>
+    `;
 
-  const banner = document.createElement('div');
-  banner.id = 'updateBanner';
-  banner.style.cssText = `
-    position: fixed; top: 0; left: 0; right: 0; z-index: 999999;
-    background: linear-gradient(135deg, #6b46c1, #8e67d6); color: white;
-    padding: 18px 20px; text-align: center; font-family: system-ui, sans-serif;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3); display: flex; flex-direction: column;
-    gap: 12px; align-items: center; animation: slideInDown 0.5s ease forwards;
-    transform: translateY(-100%);
-    padding-top: calc(18px + env(safe-area-inset-top, 0px));
-    padding-bottom: max(18px, env(safe-area-inset-bottom, 18px));
-  `;
-  banner.innerHTML = `
-    <div style="font-weight: 700; font-size: 16px;">Neue Version verfügbar!</div>
-    <button id="updateNowBtn" style="
-      background: white; color: #6b46c1; border: none; padding: 12px 32px;
-      border-radius: 14px; font-weight: 700; font-size: 15px; cursor: pointer;
-      min-width: 160px; box-shadow: 0 3px 10px rgba(0,0,0,0.2);
-    ">Jetzt aktualisieren</button>
-  `;
-  document.body.appendChild(banner);
-  requestAnimationFrame(() => banner.style.transform = 'translateY(0)');
+    document.body.appendChild(banner);
 
-  // ——— KORREKTER KLICK-HANDLER (alles hier drin!) ———
-  document.getElementById('updateNowBtn').onclick = () => {
-    allowReload = true;                    // ← hier setzen!
-    banner.remove();                       // ← Banner sofort weg
-    if (newServiceWorker) {
-      newServiceWorker.postMessage({ type: 'SKIP_WAITING' });
-    }
-  };
+    // Installieren
+    document.getElementById('installPwaBtn').onclick = async () => {
+        banner.remove();
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        if (outcome === 'accepted') {
+            showFancyAlert('LernDashboard wurde installiert!', 'success');
+        }
+    };
+
+    // Schließen
+    document.getElementById('closePwaBanner').onclick = () => {
+        banner.style.animation = 'slideDown 0.5s ease forwards';
+        setTimeout(() => banner.remove(), 500);
+        localStorage.setItem('pwaBannerLastShown', Date.now().toString());
+    };
+
+    // Auto-Close nach 10 Sekunden (genug Zeit!)
+    setTimeout(() => {
+        if (banner && banner.parentElement) {
+            banner.style.animation = 'slideDown 0.5s ease forwards';
+            setTimeout(() => banner.remove(), 500);
+            localStorage.setItem('pwaBannerLastShown', Date.now().toString());
+        }
+    }, 10000);
 }
 
 // === NUR NACH KICK RELOAD (bleibt genau so!) ===
