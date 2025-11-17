@@ -1288,6 +1288,91 @@ window.addEventListener('beforeinstallprompt', (e) => {
   showPWAInstallBanner(); // ← JETZT WIRD ER ANGEZEIGT!
 });
 
+// === SCHÖNES PWA-INSTALLATIONS-BANNER (mit längerem Anzeigen!) ===
+function showPWAInstallBanner() {
+    // Nur einmal pro Sitzung oder alle 24h
+    const lastShown = localStorage.getItem('pwaBannerLastShown');
+    const now = Date.now();
+    if (lastShown && (now - parseInt(lastShown)) < 86400000) return; // 24 Stunden
+
+    const banner = document.createElement('div');
+    banner.id = 'pwaInstallBanner';
+    banner.style.cssText = `
+        position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+        background: white; color: #333; padding: 16px 24px; border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 99999;
+        display: flex; align-items: center; gap: 16px; max-width: 90%;
+        font-family: system-ui, sans-serif; animation: slideUp 0.5s ease;
+        border: 3px solid #6b46c1;
+    `;
+    banner.innerHTML = `
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="#6b46c1">
+            <path d="M17 18H7V6h10v1h2V3c0-1.1-.9-2-2-2H7c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-4h-2v1z"/>
+            <path d="M14 9h5l-7 7-7-7h5V3h4v6z"/>
+        </svg>
+        <div>
+            <strong style="font-size:16px;display:block;margin-bottom:4px;">
+                LernDashboard als App installieren?
+            </strong>
+            <span style="font-size:14px;color:#666;">
+                Für schnelleren Zugriff – direkt vom Homescreen!
+            </span>
+        </div>
+        <button id="installPwaBtn" style="
+            background:#6b46c1;color:white;border:none;padding:10px 20px;
+            border-radius:10px;font-weight:700;cursor:pointer;margin-left:auto;
+        ">Installieren</button>
+        <button id="closePwaBanner" style="
+            background:none;border:none;font-size:24px;cursor:pointer;margin-left:8px;
+            color:#999;
+        ">×</button>
+    `;
+    document.body.appendChild(banner);
+
+    // Installieren-Button
+    document.getElementById('installPwaBtn').onclick = async () => {
+        banner.remove();
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log('PWA Installation:', outcome);
+        deferredPrompt = null;
+        if (outcome === 'accepted') {
+            showFancyAlert('App wurde installiert!', 'success');
+        }
+    };
+
+    // Schließen-Button
+    document.getElementById('closePwaBanner').onclick = () => {
+        banner.style.animation = 'slideDown 0.4s ease forwards';
+        setTimeout(() => banner.remove(), 400);
+        localStorage.setItem('pwaBannerLastShown', Date.now().toString());
+    };
+
+    // Auto-Close nach 8 Sekunden (genug Zeit zum Lesen + Klicken)
+    setTimeout(() => {
+        if (banner && banner.parentElement) {
+            banner.style.animation = 'slideDown 0.4s ease forwards';
+            setTimeout(() => banner.remove(), 400);
+            localStorage.setItem('pwaBannerLastShown', Date.now().toString());
+        }
+    }, 8000);
+}
+
+// Kleine Animationen fürs Banner
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideUp {
+        from { transform: translateX(-50%) translateY(100px); opacity: 0; }
+        to { transform: translateX(-50%) translateY(0); opacity: 1; }
+    }
+    @keyframes slideDown {
+        from { transform: translateX(-50%) translateY(0); opacity: 1; }
+        to { transform: translateX(-50%) translateY(100px); opacity: 0; }
+    }
+`;
+document.head.appendChild(style);
+
 // === PWA UPDATE BANNER ===
 
 function showUpdateBanner() {
