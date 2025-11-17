@@ -843,7 +843,7 @@ function updateCurrentFilters() {
 }
 
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-const VERSION = '1.6.14';
+const VERSION = '1.6.15';
 const REPO_PATH = (() => {
   if (location.hostname === 'localhost' || 
       location.hostname === '127.0.0.1' || 
@@ -1477,14 +1477,36 @@ function showUpdateBanner() {
   document.body.prepend(banner);
 
   document.getElementById('updateNowBtn').onclick = () => {
-    banner.style.animation = 'slideInDown 0.4s ease reverse forwards';
-    setTimeout(() => {
-      if (newServiceWorker) {
-        allowReload = true;
-        newServiceWorker.postMessage({ type: 'SKIP_WAITING' }); // ← passt zu deinem SW
-      }
-    }, 300);
-  };
+  // 1. Banner schön ausblenden
+  banner.style.animation = 'slideInDown 0.4s ease reverse forwards';
+
+  // 2. Kurze Bestätigung anzeigen
+  const confirmBanner = document.createElement('div');
+  confirmBanner.style.cssText = `
+    position: fixed; top: 0; left: 0; right: 0; z-index: 99999;
+    background: #27ae60; color: white; padding: 16px 20px; text-align: center;
+    font-family: system-ui, sans-serif; font-size: 15px; font-weight: 600;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    animation: slideInDown 0.4s ease;
+  `;
+  confirmBanner.innerHTML = `
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align: middle; margin-right: 8px;">
+      <path d="M20 6 L9 17 L4 12" />
+    </svg>
+    Aktualisiert! Die neue Version wird gleich geladen…
+  `;
+  document.body.prepend(confirmBanner);
+
+  // 3. SW aktivieren + Seite neu laden
+  setTimeout(() => {
+    if (newServiceWorker) {
+      allowReload = true;
+      newServiceWorker.postMessage({ type: 'SKIP_WAITING' });
+    }
+    // Optional: kurze Pause für Schönheit, dann Reload
+    setTimeout(() => location.reload(), 800);
+  }, 400);
+};
 }
 
 // Animation für das Banner
