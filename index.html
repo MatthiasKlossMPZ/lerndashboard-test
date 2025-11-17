@@ -1293,7 +1293,7 @@ function showPWAInstallBanner() {
     // Nur einmal pro Sitzung oder alle 24h
     const lastShown = localStorage.getItem('pwaBannerLastShown');
     const now = Date.now();
-    if (lastShown && (now - parseInt(lastShown)) < 86400000) return; // 24 Stunden
+    // if (lastShown && (now - parseInt(lastShown)) < 86400000) return; // 24 Stunden
 
     const banner = document.createElement('div');
     banner.id = 'pwaInstallBanner';
