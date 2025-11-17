@@ -841,7 +841,7 @@ function updateCurrentFilters() {
 }
 
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-const VERSION = '1.5.8';
+const VERSION = '1.5.9';
 const REPO_PATH = (() => {
   if (location.hostname === 'localhost' || 
       location.hostname === '127.0.0.1' || 
@@ -1205,94 +1205,51 @@ window.addEventListener('load', () => {
     }
 });
 
-// === EMPFANGE NEUE RESSOURCE AUS NEW-POPUP ===
-window.addEventListener('message', function(event) {
-    // Bestehender Code für UPDATE_RESOURCE (bleibt unverändert)
-    if (event.data && event.data.type === 'UPDATE_RESOURCE') {
+// === Alte postMessage + neue BroadcastChannel-Unterstützung ===
+function handleResourceMessage(event) {
+    if (!event.data) return;
+    // Unterstützung für deine alten Nachrichten (action: 'addResource')
+    if (event.data.action === 'addResource' && event.data.resource) {
+        event.data = { type: 'ADD_RESOURCE', data: event.data.resource };
+    }
+    if (event.data.type === 'ADD_RESOURCE') {
+        const { data: newResource } = event.data;
+        if (newResource && newResource.topic) {
+            resources.push(newResource);
+            localStorage.setItem('resources', JSON.stringify(resources));
+            applyFilters();
+            updateToolFilter();
+            populateDropdowns();
+            const addAnim = document.getElementById('addAnimation');
+            if (addAnim) {
+                addAnim.classList.add('add-active');
+                setTimeout(() => addAnim.classList.remove('add-active'), 1200);
+            }
+            showFancyAlert('Ressource erfolgreich hinzugefügt!', 'success');
+        }
+    }
+    if (event.data.type === 'UPDATE_RESOURCE') {
         const { index, data } = event.data;
         if (index >= 0 && index < resources.length) {
             resources[index] = data;
             localStorage.setItem('resources', JSON.stringify(resources));
             applyFilters();
-            // Erfolgsanimation
             const anim = document.getElementById('editAnimation');
             if (anim) {
                 anim.classList.add('edit-active');
                 setTimeout(() => anim.classList.remove('edit-active'), 1200);
             }
         }
-        return;  // ← Stoppt hier, falls Update
     }
-
-    // NEU: Handler für ADD_RESOURCE (neue Ressourcen)
-    if (event.data && event.data.type === 'ADD_RESOURCE') {
-        const { data: newResource } = event.data;
-        if (newResource && newResource.topic) {  // Sicherstellen, dass es gültige Daten sind
-            resources.push(newResource);  // Neu zur Liste hinzufügen
-            localStorage.setItem('resources', JSON.stringify(resources));  // Speichern
-            applyFilters();  // Dashboard sofort aktualisieren
-            updateToolFilter();  // Tools-Dropdown erneuern
-            populateDropdowns();  // Alle Dropdowns updaten
-
-            // Erfolgsanimation triggern
-            const addAnim = document.getElementById('addAnimation');
-            if (addAnim) {
-                addAnim.classList.add('add-active');
-                setTimeout(() => addAnim.classList.remove('add-active'), 1200);
-            }
-
-            // Optional: Fancy Alert für Feedback
-            showFancyAlert('Ressource erfolgreich hinzugefügt!', 'success');
-        } else {
-            console.error('Ungültige neue Ressource:', newResource);
-        }
-    }
-});
-
-// === PWA INSTALL BANNER ===
-
-function showPWAInstallBanner() {
-  let banner = document.getElementById('pwaInstallBanner');
-  if (banner) {
-    banner.style.display = 'flex';
-    return;
-  }
-
-  banner = document.createElement('div');
-  banner.id = 'pwaInstallBanner';
-  banner.style.cssText = `
-    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
-    background:#6b46c1; color:white; padding:12px 20px; border-radius:12px;
-    box-shadow:0 8px 32px rgba(107,70,193,0.4); font-size:14px; z-index:9998;
-    display:flex; align-items:center; gap:10px; animation:slideUp 0.5s ease;
-  `;
-  banner.innerHTML = `
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-    </svg>
-    <strong>App installieren?</strong>
-    <button id="installPwaBtn" style="background:white; color:#6b46c1; border:none; border-radius:8px; padding:4px 12px; margin-left:8px; font-weight:600; cursor:pointer;">Installieren</button>
-    <button id="closePwaBanner" style="background:none; border:none; color:white; font-size:18px; margin-left:8px; cursor:pointer;">×</button>
-  `;
-  document.body.appendChild(banner);
-
-  document.getElementById('installPwaBtn').onclick = async () => {
-    banner.style.display = 'none';
-    if (!deferredPrompt) return;
-
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    console.log('PWA Installation:', outcome);
-
-    if (outcome === 'accepted') {
-      deferredPrompt = null;
-    }
-  };
-
-  document.getElementById('closePwaBanner').onclick = () => {
-    banner.style.display = 'none';
-    deferredPrompt = null; // Verhindert erneuten Aufruf
-  };
+}
+// 1. Klassischer Listener
+window.addEventListener('message', handleResourceMessage);
+// 2. Fallback: BroadcastChannel (für installierte PWAs)
+try {
+    const channel = new BroadcastChannel('lerndashboard-channel');
+    channel.onmessage = handleResourceMessage;
+} catch (e) {
+    console.warn('BroadcastChannel nicht unterstützt');
 }
 
 // === PWA INSTALLATION ===

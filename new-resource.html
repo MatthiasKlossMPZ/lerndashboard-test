@@ -76,29 +76,40 @@ for (let i = 1; i <= 13; i++) {
 </div>
 
 <script>
-// === ABBRECHEN ===
+// === ABBRECHEN (bleibt fast gleich) ===
 function cancel() {
     const topic = document.getElementById('topic').value.trim();
     const subject = document.getElementById('subject').value;
     const grade = document.getElementById('grade').value;
     const competence = document.getElementById('competence').value;
     const level = document.getElementById('level').value;
-
     const hasInput = topic || subject || grade || competence || level;
-
     if (hasInput && !confirm('Möchtest du wirklich abbrechen? Deine Eingaben gehen verloren.')) {
         return;
-    }
-
-    if (window.opener && !window.opener.closed) {
-        window.opener.postMessage({ action: 'cancelAddResource' }, '*');
     }
     window.close();
 }
 
-// === SPEICHERN ===
+// === ROBUSTER VERSAND ANS HAUPTFENSTER (neu & wichtig!) ===
+function sendToMainWindow(type, payload) {
+    // 1. Klassisch über opener (funktioniert meistens)
+    if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type, ...payload }, '*');
+    }
+    // 2. Fallback: BroadcastChannel → funktioniert IMMER in derselben PWA
+    try {
+        const channel = new BroadcastChannel('lerndashboard-channel');
+        channel.postMessage({ type, ...payload });
+        channel.close();
+    } catch (e) {
+        console.warn('BroadcastChannel nicht verfügbar', e);
+    }
+}
+
+// === SPEICHERN (komplett überarbeitet) ===
 document.getElementById('resourceForm').onsubmit = e => {
     e.preventDefault();
+
     const resource = {
         topic: document.getElementById('topic').value.trim(),
         subject: document.getElementById('subject').value,
@@ -111,21 +122,21 @@ document.getElementById('resourceForm').onsubmit = e => {
         lastModified: new Date().toLocaleDateString('de-DE')
     };
 
+    // Pflichtfelder prüfen
     if (!resource.topic || !resource.subject || !resource.grade || !resource.competence || !resource.level) {
         alert('Bitte alle Pflichtfelder ausfüllen!');
         return;
     }
 
-    if (window.opener && !window.opener.closed) {
-        window.opener.postMessage({
-            action: 'addResource',
-            resource: resource
-        }, '*');
-    }
+    // WICHTIG: Neuer einheitlicher Typ + robustes Senden
+    sendToMainWindow('ADD_RESOURCE', { data: resource });
+
+    // Feedback + schließen
+    alert('Ressource erfolgreich gespeichert!');
     window.close();
 };
 
-// Dark Mode synchronisieren
+// Dark Mode vom Hauptfenster übernehmen
 if (window.opener && window.opener.document.body.classList.contains('dark')) {
     document.body.classList.add('dark');
 }
