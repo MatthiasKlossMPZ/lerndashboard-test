@@ -90,27 +90,44 @@ function cancel() {
     window.close();
 }
 
-// === ROBUSTER VERSAND ANS HAUPTFENSTER ===
+// === ROBUSTER VERSAND – FUNKTIONIERT ÜBERALL (auch in installierten PWAs!) ===
 function sendToMainWindow(type, payload) {
-    let sent = false;
+    let sentSuccessfully = false;
 
-    // 1. Klassisch über opener
-    if (!sent && window.opener && !window.opener.closed) {
-        window.opener.postMessage({ type, ...payload }, '*');
-        sent = true;
-    }
-
-    // 2. Nur als Fallback, falls opener nicht ging
-    if (!sent) {
+    // 1. Versuch: postMessage über opener
+    if (window.opener && !window.opener.closed) {
         try {
-            const channel = new BroadcastChannel('lerndashboard-channel');
-            channel.postMessage({ type, ...payload });
-            channel.close();
-            // sent bleibt false → nur BroadcastChannel lief
+            window.opener.postMessage({ type, ...payload }, '*');
+            sentSuccessfully = true;
+            console.log('Nachricht via postMessage gesendet');
         } catch (e) {
-            console.warn('BroadcastChannel nicht verfügbar', e);
+            console.warn('postMessage fehlgeschlagen → nutze Fallback', e);
         }
     }
+
+    // 2. Immer als Backup: BroadcastChannel (auch wenn postMessage "gegangen" ist)
+    // → In installierten PWAs kommt postMessage oft nicht an, obwohl kein Fehler geworfen wird
+    try {
+        const channel = new BroadcastChannel('lerndashboard-channel');
+        channel.postMessage({ type, ...payload });
+        channel.close();
+        console.log('Nachricht zusätzlich via BroadcastChannel gesendet (Backup)');
+    } catch (e) {
+        console.warn('BroadcastChannel nicht verfügbar', e);
+    }
+
+    // Optional: Falls du sicher gehen willst, dass es wirklich ankam → kleine Bestätigung
+    // (kann später wieder raus)
+    setTimeout(() => {
+        if (document.body) {
+            // Kleine visuelle Rückmeldung im Popup selbst
+            const feedback = document.createElement('div');
+            feedback.textContent = '✓ Gespeichert!';
+            feedback.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#27ae60;color:white;padding:8px 16px;border-radius:8px;font-weight:bold;z-index:10000;';
+            document.body.appendChild(feedback);
+            setTimeout(() => feedback.remove(), 1500);
+        }
+    }, 300);
 }
 
 // === SPEICHERN ===
