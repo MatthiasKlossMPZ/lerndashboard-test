@@ -843,7 +843,7 @@ function updateCurrentFilters() {
 }
 
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-const VERSION = '1.7.1';
+const VERSION = '1.7.5';
 const REPO_PATH = (() => {
   if (location.hostname === 'localhost' || 
       location.hostname === '127.0.0.1' || 
@@ -1243,6 +1243,7 @@ function handleResourceMessage(event) {
             }
             showFancyAlert('Ressource erfolgreich hinzugefügt!', 'success');
         }
+        
     }
 
     // === UPDATE RESSOURCE ===
@@ -1260,6 +1261,15 @@ function handleResourceMessage(event) {
             }
         }
     }
+    if (event.data.type === 'SHOW_EDIT_SUCCESS') {
+    setTimeout(() => {
+        const anim = document.getElementById('editAnimation');
+        if (anim) {
+            anim.classList.add('edit-active');
+            setTimeout(() => anim.classList.remove('edit-active'), 1200);
+        }
+    }, 250); 
+}
 }
 
 // 1. Klassischer Listener
@@ -2855,6 +2865,8 @@ function deleteResource(i) {
     // === BEARBEITEN ===
 function editResource(i) {
     const r = resources[i];
+
+    // Popup mit sauberer URL öffnen
     const popup = window.open('edit-resource.html', 'editResource', 'width=680,height=760,resizable=yes,scrollbars=yes');
     
     if (!popup) {
@@ -2862,27 +2874,45 @@ function editResource(i) {
         return;
     }
 
-    // Wichtig: Warte kurz, bis das Popup geladen ist
-    popup.addEventListener('load', () => {
+    // Daten sofort schicken – egal ob das Popup schon geladen ist oder nicht
+    const sendData = () => {
         popup.postMessage({
             type: 'EDIT_RESOURCE',
             index: i,
             data: r
         }, location.origin);
-    }, { once: true });
+    };
+
+    // Versuch 1: Sofort senden
+    sendData();
+
+    // Versuch 2: Falls nicht, dann beim load-Event
+    popup.addEventListener('load', sendData, { once: true });
+
+    // Versuch 3: Poll-Mechanik als absoluter Fallback
+    let attempts = 0;
+    const interval = setInterval(() => {
+        if (attempts++ > 20) { // max. 2 Sekunden warten
+            clearInterval(interval);
+            return;
+        }
+        try {
+            sendData();
+        } catch(e) {}
+    }, 100);
 }
 
 function openNewResourceWindow() {
     const popup = window.open('new-resource.html', 'newResource', 'width=680,height=760,resizable=yes,scrollbars=yes');
-    if (!popup) alert('Popup wurde blockiert – bitte erlauben!');
-}
-
-// Schützt vor versehentlichem Doppel-Download durch Enter
-document.querySelectorAll('.btn').forEach(btn => {
-    if (btn.onclick || btn.getAttribute('onclick')) {
-        btn.type = 'button';
+    if (!popup) {
+        alert('Popup wurde blockiert – bitte erlauben!');
+        return;
     }
-});
+
+    const send = () => popup.postMessage({ type: 'NEW_RESOURCE' }, location.origin);
+    send();
+    popup.addEventListener('load', send, { once: true });
+}
 
 </script>  <!-- ← ENDE SCRIPT -->
 
