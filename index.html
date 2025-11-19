@@ -2853,19 +2853,29 @@ function deleteResource(i) {
 }
 
     // === BEARBEITEN ===
-    function editResource(i) {
+function editResource(i) {
     const r = resources[i];
-    const data = encodeURIComponent(JSON.stringify(r));
-    const url = `edit-resource.html?v=${VERSION}&index=${i}&data=${data}`;
-    const popup = window.open(url, 'editResource', 'width=680,height=760,resizable=yes,scrollbars=yes');
-    if (!popup) alert('Popup wurde blockiert – bitte erlauben!');
+    const popup = window.open('edit-resource.html', 'editResource', 'width=680,height=760,resizable=yes,scrollbars=yes');
+    
+    if (!popup) {
+        alert('Popup wurde blockiert – bitte erlauben!');
+        return;
     }
 
-    function openNewResourceWindow() {
-    const url = `new-resource.html?v=${VERSION}`;
-    const popup = window.open(url, 'newResource', 'width=680,height=760,resizable=yes,scrollbars=yes');
+    // Wichtig: Warte kurz, bis das Popup geladen ist
+    popup.addEventListener('load', () => {
+        popup.postMessage({
+            type: 'EDIT_RESOURCE',
+            index: i,
+            data: r
+        }, location.origin);
+    }, { once: true });
+}
+
+function openNewResourceWindow() {
+    const popup = window.open('new-resource.html', 'newResource', 'width=680,height=760,resizable=yes,scrollbars=yes');
     if (!popup) alert('Popup wurde blockiert – bitte erlauben!');
-    }
+}
 
 // Schützt vor versehentlichem Doppel-Download durch Enter
 document.querySelectorAll('.btn').forEach(btn => {
