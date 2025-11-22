@@ -886,14 +886,14 @@ dialog#confirmDeleteDialog button[value="delete"]:hover {
                 title="Erstellt sofort ein lokales Backup aller Daten">Backup jetzt</button>
     </div>
     </div>
-    <!-- Hilfe-Button (rechtsbündig) -->
-    <div style="margin-left: auto; padding-top: 10px;">  <!-- Leichter Abstand oben für Ausrichtung zur h4 -->
+        <!-- Hilfe-Button (rechtsbündig) -->
+        <div style="margin-left: auto; padding-top: 10px;">
         <button class="action-icon edit-icon" onclick="window.location.href = 'docs/Bedienungsanleitung_LernDashboard_v1.1.9.pdf';" title="Bedienungsanleitung herunterladen">
             <svg width="18" height="18" viewBox="0 0 20 20">
                 <text x="10" y="15" font-size="18" text-anchor="middle" fill="currentColor">?</text>
             </svg>
         </button>
-    </div>
+        </div>
 
 <!-- ZENTRIERTE NEUE-RESSOURCE-BUTTON -->
 <div class="centered-button-wrapper">
@@ -979,11 +979,13 @@ const competences = [
 ];
 // === BEDIENUNGSANLEITUNG ===
 function openManual() {
-    const modal = document.createElement('dialog');
-    modal.innerHTML = `<iframe src="docs/Bedienungsanleitung_LernDashboard_v1.1.9.pdf" style="width:100%; height:80vh;"></iframe>
-                       <button onclick="this.parentNode.close()">Schließen</button>`;
-    document.body.appendChild(modal);
-    modal.showModal();
+    const dialog = document.createElement('dialog');
+    dialog.style = 'width: 90%; max-width: 800px; height: 80vh; padding: 0; border-radius: 12px; box-shadow: var(--shadow);';
+    dialog.innerHTML = `
+        <iframe src="docs/Bedienungsanleitung_LernDashboard_v1.1.9.pdf" style="width:100%; height:100%; border:none;"></iframe>
+        <button onclick="this.parentNode.close()" style="position:absolute; top:10px; right:10px; background:var(--primary); color:white; padding:8px 16px; border:none; border-radius:8px; cursor:pointer;">Schließen</button>`;
+    document.body.appendChild(dialog);
+    dialog.showModal();
 }
 
 // === ALLE FUNKTIONEN ===
