@@ -169,8 +169,6 @@
         align-self: flex-end;
     }
     .export-buttons { margin: 15px 0; display: flex; gap: 10px; flex-wrap: wrap; }
-    .btn { color: white; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: normal; transition: 0.2s; }
-    .btn:hover { opacity: 0.9; transform: translateY(-1px); }
     .file-input { display: none; }
     .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin: 16px 0; }
     .stat-card { background: var(--card); padding: 12px; border-radius: 10px; text-align: center; box-shadow: var(--shadow); font-weight: 600; }
@@ -381,39 +379,8 @@
     box-shadow: 0 4px 10px rgba(197, 143, 224, 0.35);
 }
 
-/* 1. ALLE EXPORT → VIOLETT */
-.btn.csv,
-.btn.pdf,
-.btn.matrix {
-    background: var(--primary);
-    color: white;
-}
-
-/* 2. IMPORT & VORLAGE → BLAU */
-.btn.import,
-.btn.template {
-    background: #2980b9;
-    color: white;
-}
-
-/* 3. DRUCKEN → DUNKELGRAU */
-.btn.print {
-    background: #2c3e50;
-    color: white;
-}
-
-/* Import-Button bleibt zentriert */
-.export-buttons .btn.import span {
-    width: 100%;
-    text-align: center;
-}
-
 /* Hover für alle */
-.export-buttons .btn:hover {
-    opacity: 0.92;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-}
+
     .export-buttons {
         flex-wrap: wrap;
         gap: 8px;
@@ -628,71 +595,10 @@ dialog#confirmDeleteDialog button[value="delete"]:hover {
     overflow: visible !important;   /* ← das war der Übeltäter */
 }
 
-/* ============================================================= */
-/* ULTRA-SCHLANK & EINHEITLICH → nur 38 px hoch                */
-/* ============================================================= */
-.export-buttons .btn,
-.export-buttons label.btn {
-    min-height: 38px !important;       /* richtig flach, aber noch gut bedienbar */
-    height: 38px !important;           /* erzwingt exakt 38px (wichtig für <label>) */
-    padding: 0 16px !important;        /* schmaler, aber ausreichend */
-    font-size: 13.8px !important;      /* perfekt lesbar */
-    font-weight: 600 !important;
-    display: flex !important;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    border-radius: 9px !important;     /* leicht abgerundet, wirkt edel */
-    box-sizing: border-box !important;
-    line-height: 1 !important;         /* verhindert zusätzlichen Text-Abstand */
-}
+/* =============================================*/
+/* Export-Buttons (38px, bunt, HOVER inklusive) */
+/* ============================================ */
 
-/* File-Input komplett aus dem Spiel nehmen */
-.export-buttons .btn.import input[type="file"] {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 0;
-    cursor: pointer;
-    font-size: 0;
-    margin: 0;
-    padding: 0;
-    appearance: none;       /* zusätzliche Absicherung (manche Browser) */
-}
-
-/* ============================================================= */
-/* HOVER-EFFEKTE 2025 – ultra-clean & professionell           */
-/* ============================================================= */
-.export-buttons .btn:hover,
-.export-buttons label.btn:hover {
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: 0 10px 25px rgba(107,70,193,0.28) !important;
-    transition: all 0.28s cubic-bezier(0.34,1.56,0.64,1) !important;
-}
-
-/* Noch schöner: Bei dunklen Farben (Drucken, Matrix PDF) etwas helleren Schatten */
-.export-buttons .btn.print:hover   { box-shadow: 0 10px 25px rgba(44,62,80,0.4) !important; }
-.export-buttons .btn[onclick="autoBackup()"]:hover { box-shadow: 0 10px 25px rgba(46,204,113,0.4) !important; }
-
-/* BACKUP-BUTTON WIRKLICH GRÜN – kommt ZULETZT → gewinnt immer */
-.export-buttons .btn[onclick="autoBackup()"],
-.export-buttons button[onclick="autoBackup()"] {
-    background: #2ecc71 !important;
-    color: white !important;
-}
-
-.export-buttons .btn[onclick="autoBackup()"]:hover {
-    background: #27ae60 !important;
-    transform: translateY(-2px) scale(1.02) !important;
-    box-shadow: 0 10px 25px rgba(46,204,113,0.45) !important;
-}
-
-/* ============================================================= */
-/* FINALER, SAUBERER ZUSTAND – ab jetzt alles an einem Ort   */
-/* ============================================================= */
-
-/* 1. Alle Export-Buttons grundsätzlich violett */
 .export-buttons .btn,
 .export-buttons label.btn {
     min-height: 38px !important;
@@ -707,38 +613,36 @@ dialog#confirmDeleteDialog button[value="delete"]:hover {
     border-radius: 9px !important;
     box-sizing: border-box !important;
     line-height: 1 !important;
-    
-    /* ← hier wieder die Standardfarbe! */
     background: var(--primary);
-    color: white !important;
+    color: white;
+    transition: all 0.28s cubic-bezier(0.34,1.56,0.64,1) !important; /* ← WICHTIG */
 }
 
-/* 2. File-Input unsichtbar */
+/* Hover – für ALLE Buttons (inkl. Spezialfarben) */
+.export-buttons .btn:hover,
+.export-buttons label.btn:hover {
+    transform: translateY(-2px) scale(1.02) !important;
+    box-shadow: 0 10px 25px rgba(107,70,193,0.28) !important;
+}
+
+/* Spezial-Hover für dunkle/grüne Buttons */
+.export-buttons .btn.print:hover      { box-shadow: 0 10px 25px rgba(44,62,80,0.4) !important; }
+.export-buttons .btn[onclick="autoBackup()"]:hover {
+    background: #27ae60 !important;
+    box-shadow: 0 10px 25px rgba(46,204,113,0.45) !important;
+}
+
+/* File-Input unsichtbar */
 .export-buttons .btn.import input[type="file"] {
     position: absolute; inset: 0; opacity: 0; cursor: pointer;
     font-size: 0; margin: 0; padding: 0; appearance: none;
 }
 
-/* 3. Hover für alle */
-.export-buttons .btn:hover,
-.export-buttons label.btn:hover {
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: 0 10px 25px rgba(107,70,193,0.28) !important;
-    transition: all 0.28s cubic-bezier(0.34,1.56,0.64,1) !important;
-}
-.export-buttons .btn.print:hover { box-shadow: 0 10px 25px rgba(44,62,80,0.4) !important; }
+/* Spezialfarben – überschreiben nur den Ruhezustand */
+.export-buttons .btn.import                  { background: #2980b9 !important; }
+.export-buttons .btn.print                   { background: #2c3e50 !important; }
+.export-buttons .btn[onclick="autoBackup()"] { background: #2ecc71 !important; }
 
-/* 4. Die vier Sonderfarben – kommen ZU LETZT → überschreiben alles davor */
-.export-buttons .btn.import                    { background: #2980b9 !important; }  /* blau */
-.export-buttons .btn.print                     { background: #2c3e50 !important; }  /* dunkelgrau */
-.export-buttons .btn[onclick="autoBackup()"]   { background: #2ecc71 !important; }  /* grün */
-.export-buttons .btn[onclick="autoBackup()"]:hover { 
-    background: #27ae60 !important;
-    box-shadow: 0 10px 25px rgba(46,204,113,0.45) !important;
-}
-
-/* Matrix-Buttons behalten ihre eigenen Farben (stehen ja schon im HTML) */
-.export-buttons .btn.matrix { color: white !important; }
     </style>
 </head>
 <body>
