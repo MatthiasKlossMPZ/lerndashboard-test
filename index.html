@@ -946,7 +946,7 @@ function updateCurrentFilters() {
 }
 
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-const VERSION = '1.1.9';
+const VERSION = '1.1.10';
 const REPO_PATH = (() => {
   if (location.hostname === 'localhost' || 
       location.hostname === '127.0.0.1' || 
@@ -982,7 +982,7 @@ function openManual() {
     const dialog = document.createElement('dialog');
     dialog.style = 'width: 90%; max-width: 800px; height: 80vh; padding: 0; border-radius: 12px; box-shadow: var(--shadow);';
     dialog.innerHTML = `
-        <iframe src="https://matthiasklossmpz.github.io/lerndashboard/docs/Bedienungsanleitung_LernDashboard_v1.1.9.pdf" style="width:100%; height:100%; border:none;"></iframe>
+        <iframe src="https://matthiasklossmpz.github.io/lerndashboard/docs/Bedienungsanleitung_LernDashboard.pdf" style="width:100%; height:100%; border:none;"></iframe>
         <button onclick="this.parentNode.close()" style="position:absolute; top:10px; right:10px; background:var(--primary); color:white; padding:8px 16px; border:none; border-radius:8px; cursor:pointer;">Schließen</button>`;
     document.body.appendChild(dialog);
     dialog.showModal();
@@ -3132,7 +3132,7 @@ function openManual() {
     dialog.id = 'manualDialog';  // Für Styling
     dialog.style = 'width: 90%; max-width: 800px; height: 80vh; padding: 0; border-radius: 12px; box-shadow: var(--shadow); background: var(--card); position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);';
     dialog.innerHTML = `
-        <iframe src="docs/Bedienungsanleitung_LernDashboard_v1.1.9.pdf" style="width:100%; height: calc(100% - 40px); border:none;"></iframe>
+        <iframe src="docs/Bedienungsanleitung_LernDashboard.pdf" style="width:100%; height: calc(100% - 40px); border:none;"></iframe>
         <button onclick="this.parentNode.close()" style="position:absolute; bottom:10px; right:10px; background:var(--primary); color:white; padding:8px 16px; border:none; border-radius:8px; cursor:pointer; font-weight:600;">Schließen</button>`;
     document.body.appendChild(dialog);
     dialog.showModal();
