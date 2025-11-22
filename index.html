@@ -982,7 +982,7 @@ function openManual() {
     const dialog = document.createElement('dialog');
     dialog.style = 'width: 90%; max-width: 800px; height: 80vh; padding: 0; border-radius: 12px; box-shadow: var(--shadow);';
     dialog.innerHTML = `
-        <iframe src="docs/Bedienungsanleitung_LernDashboard_v1.1.9.pdf" style="width:100%; height:100%; border:none;"></iframe>
+        <iframe src="https://matthiasklossmpz.github.io/lerndashboard/docs/Bedienungsanleitung_LernDashboard_v1.1.9.pdf" style="width:100%; height:100%; border:none;"></iframe>
         <button onclick="this.parentNode.close()" style="position:absolute; top:10px; right:10px; background:var(--primary); color:white; padding:8px 16px; border:none; border-radius:8px; cursor:pointer;">Schließen</button>`;
     document.body.appendChild(dialog);
     dialog.showModal();
