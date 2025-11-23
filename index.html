@@ -969,7 +969,7 @@ function updateCurrentFilters() {
 }
 
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-const VERSION = '1.1.11';
+const VERSION = '1.1.12';
 const REPO_PATH = (() => {
   if (location.hostname === 'localhost' || 
       location.hostname === '127.0.0.1' || 
@@ -2767,7 +2767,7 @@ function parseCSVLine(line) {
     return result;
 }
 
-// === CSV IMPORT – 100% SICHER & MIT DEBUG ===
+// ==================== CSV IMPORT – KOMPLETT NEU, ROBUST & FUNKTIONIEREND ====================
 function importCSV(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -2776,7 +2776,7 @@ function importCSV(event) {
     reader.onload = function(e) {
         const csv = e.target.result;
         if (!csv.trim()) {
-            showAlert('CSV-Datei ist leer!');
+            showFancyAlert('CSV-Datei ist leer!', 'warning');
             return;
         }
         showImportPreview(csv);
@@ -2785,55 +2785,175 @@ function importCSV(event) {
     event.target.value = '';
 }
 
-// Vorschau-Popup
 function showImportPreview(csvString) {
     const lines = csvString.split('\n').map(l => l.trim()).filter(l => l);
-    if (lines.length < 1) {
-        showAlert('Keine Daten in der CSV gefunden.');
-        return;
-    }
+    if (lines.length < 1) return showFancyAlert('Keine Daten gefunden.', 'warning');
+
     const headers = parseCSVLine(lines[0]);
     const data = [];
     for (let i = 1; i < lines.length; i++) {
         const values = parseCSVLine(lines[i]);
         const row = {};
         headers.forEach((h, idx) => row[h] = (values[idx] || '').trim());
-        if (row['Thema']) data.push(row);
-    }
-    if (data.length === 0) {
-        showAlert('Keine gültigen Einträge mit "Thema" gefunden.');
-        return;
+        if (row['Thema'] || row['Unterrichtsfach']) data.push(row);
     }
 
-    // Vorschau-Tabelle (unverändert)
+    if (data.length === 0) return showFancyAlert('Keine gültigen Einträge gefunden.', 'warning');
+
     let previewHtml = `<div style="max-height:300px;overflow-y:auto;margin:10px 0;"><table style="width:100%;border-collapse:collapse;font-size:13px;">`;
-    previewHtml += `<tr style="background:#6b46c1;color:white;"><th style="padding:8px;text-align:left;">${headers.slice(0, 6).join('</th><th style="padding:8px;text-align:left;">')}</th></tr>`;
+    previewHtml += `<tr style="background:#6b46c1;color:white;"><th style="padding:8px;text-align:left;">${headers.slice(0,6).join('</th><th style="padding:8px;text-align:left;">')}</th></tr>`;
     data.slice(0, 8).forEach(row => {
-        previewHtml += `<tr style="border-bottom:1px solid #eee;"><td style="padding:8px;">${Object.values(row).slice(0, 6).map(escapeHtml).join('</td><td style="padding:8px;">')}</td></tr>`;
+        previewHtml += `<tr style="border-bottom:1px solid #eee;"><td style="padding:8px;">${Object.values(row).slice(0,6).map(escapeHtml).join('</td><td style="padding:8px;">')}</td></tr>`;
     });
     if (data.length > 8) previewHtml += `<tr><td colspan="6" style="text-align:center;color:#666;padding:8px;font-style:italic;">… und ${data.length - 8} weitere</td></tr>`;
     previewHtml += `</table></div>`;
 
     const modal = document.createElement('div');
-    modal.style.cssText = `
-        position:fixed;top:0;left:0;width:100%;height:100%;
-        background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);
-        display:flex;justify-content:center;align-items:center;
-        z-index:20000;padding:20px;box-sizing:border-box;
-    `;
+    modal.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);display:flex;justify-content:center;align-items:center;z-index:20000;padding:20px;`;
     modal.innerHTML = `
         <div style="background:var(--card);padding:28px;border-radius:16px;max-width:90%;width:600px;box-shadow:0 16px 48px rgba(0,0,0,0.3);">
             <h3 style="margin:0 0 12px;color:var(--text);font-size:19px;font-weight:700;">Import-Vorschau</h3>
-            <p style="margin:0 0 16px;color:var(--text-light);font-size:15px;">
-                ${data.length} Ressource${data.length === 1 ? '' : 'n'} werden importiert
+            <p style="margin:0 0 16px;color:var(--text-light);font-size:14px;">
+            ${data.length} Datensatz${data.length === 1 ? '' : 'e'} in der Import-Datei gefunden<br>
+            <small style="color:#777;">Duplikate und ähnliche Einträge werden im nächsten Schritt geprüft.</small>
             </p>
             ${previewHtml}
             <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px;">
-                <button id="cancelImportBtn" type="button" style="padding:10px 20px;border:1px solid #ccc;border-radius:10px;background:#f0f0f0;cursor:pointer;font-weight:600;">
-                    Abbrechen
-                </button>
-                <button id="confirmImportBtn" type="button" style="padding:10px 24px;background:var(--primary);color:white;border:none;border-radius:10px;cursor:pointer;font-weight:700;">
-                    Importieren
+                <button id="cancelImportBtn" style="padding:10px 20px;border:1px solid #ccc;border-radius:10px;background:#f0f0f0;">Abbrechen</button>
+                <button id="confirmImportBtn" style="padding:10px 24px;background:var(--primary);color:white;border:none;border-radius:10px;font-weight:700;">Importieren</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.querySelector('#cancelImportBtn').onclick = () => modal.remove();
+    modal.querySelector('#confirmImportBtn').onclick = () => {
+        modal.remove();
+        performImport(data);
+    };
+    modal.querySelector('#confirmImportBtn').focus();
+}
+
+function performImport(data) {
+    const toImport = [];
+    const duplicates = [];
+    const similar = [];
+
+    data.forEach(entry => {
+        const thema = (entry['Thema'] || entry['Thema'] || '').trim();
+        const beschreibung = (entry['Beschreibung'] || entry['Beschreibung'] || '').trim();
+        const fach = (entry['Unterrichtsfach'] || entry['Unterrichtsfach'] || '').trim();
+        const klasse = (entry['Klassenstufe'] || entry['Klassenstufe'] || '').trim();
+        const kompetenz = (entry['Kompetenzbereich'] || entry['Kompetenzbereich'] || '').trim();
+        const niveau = (entry['Niveaustufe'] || entry['Niveaustufe'] || '').trim();
+        const tool = (entry['Digitales_Hilfsmittel'] || entry['Digitales_Hilfsmittel'] || '').trim();
+
+        if (!thema && !fach && !klasse && !kompetenz && !niveau && !tool && !beschreibung) return;
+
+        const normalized = {
+            topic: thema || '(Ohne Thema)',
+            subject: fach,
+            grade: klasse,
+            competence: kompetenz,
+            level: niveau,
+            tool: tool,
+            description: beschreibung
+        };
+
+        const exact = resources.some(r =>
+            (r.topic || '').trim() === normalized.topic &&
+            (r.subject || '').trim() === normalized.subject &&
+            (r.grade || '').trim() === normalized.grade &&
+            (r.competence || '').trim() === normalized.competence &&
+            (r.level || '').trim() === normalized.level &&
+            (r.tool || '').trim() === normalized.tool &&
+            (r.description || '').trim() === normalized.description
+        );
+
+        if (exact) {
+            duplicates.push(normalized);
+            return;
+        }
+
+const similarMatch = resources.find(r =>
+    (r.subject || '').trim().toLowerCase() === normalized.subject.toLowerCase() &&
+    (r.grade || '').trim() === normalized.grade &&
+    (r.competence || '').trim().toLowerCase() === normalized.competence.toLowerCase() &&
+    (r.level || '').trim() === normalized.level &&
+    ((r.tool || '').trim().toLowerCase()) === (normalized.tool.toLowerCase())
+);
+
+        if (similarMatch) {
+            similar.push({ ...normalized, existing: similarMatch });
+        } else {
+            toImport.push(normalized);
+        }
+    });
+
+    if (similar.length === 0) {
+        if (toImport.length > 0) {
+            resources.push(...toImport.map(r => ({ ...r, favorite: false })));
+            saveAndRefresh(toImport.length, duplicates.length);
+        } else {
+            showFancyAlert('Keine neuen Ressourcen gefunden.', 'info');
+        }
+        return;
+    }
+
+    showSimilarDecisionDialog(toImport, similar, duplicates);
+}
+
+function showSimilarDecisionDialog(newOnes, similarOnes, duplicates) {
+    const modal = document.createElement('div');
+    modal.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;
+        background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);
+        display:flex;justify-content:center;align-items:center;z-index:20000;padding:20px;`;
+    
+    modal.innerHTML = `
+        <div style="background:var(--card);padding:28px;border-radius:16px;max-width:960px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+            <h3 style="margin:0 0 16px;color:var(--text);font-size:20px;">Ähnliche Einträge gefunden</h3>
+            <p style="margin:0 0 16px;color:var(--text-light);">
+                <strong>${newOnes.length}</strong> neue • 
+                <strong>${duplicates.length}</strong> exakte Duplikate • 
+                <strong>${similarOnes.length}</strong> ähnliche
+            </p>
+
+            <div style="max-height:460px;overflow-y:auto;border:1px solid #ddd;border-radius:8px;">
+                <table style="width:100%;border-collapse:collapse;font-size:14px;">
+                    <thead style="background:#6b46c1;color:white;position:sticky;top:0;z-index:10;">
+                        <tr>
+                            <th style="padding:12px;width:40px;"><input type="checkbox" id="selectAllSimilar" checked></th>
+                            <th style="padding:12px;">Neues Thema</th>
+                            <th style="padding:12px;">Vorhandenes Thema</th>
+                            <th style="padding:12px;width:48%;">Unterschied in der Beschreibung</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${similarOnes.map((s, i) => `
+                            <tr style="border-bottom:1px solid #eee;">
+                                <td style="padding:10px;text-align:center;">
+                                    <input type="checkbox" class="similar-check" data-index="${i}" checked>
+                                </td>
+                                <td style="padding:10px;color:#27ae60;font-weight:600;">${escapeHtml(s.topic)}</td>
+                                <td style="padding:10px;color:#e74c3c;">${escapeHtml(s.existing.topic)}</td>
+                                <td style="padding:10px;font-size:13px;line-height:1.5;">
+                                    ${s.description !== s.existing.description 
+                                        ? `<strong style="color:#e67e22;">Beschreibung geändert</strong><br>
+                                           <small style="color:#27ae60;">Neu: ${escapeHtml((s.description || '–').substring(0,160))}${s.description && s.description.length > 160 ? '…' : ''}</small><br>
+                                           <small style="color:#e74c3c;">Alt: ${escapeHtml((s.existing.description || '–').substring(0,160))}${s.existing.description && s.existing.description.length > 160 ? '…' : ''}</small>`
+                                        : '<span style="color:#999;">Beschreibung identisch</span>'
+                                    }
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px;">
+                <button id="cancelSimilar" style="padding:10px 20px;border:1px solid #ccc;border-radius:10px;background:#f0f0f0;">Abbrechen</button>
+                <button id="confirmSimilar" style="padding:10px 28px;background:var(--primary);color:white;border:none;border-radius:10px;font-weight:700;">
+                    ${similarOnes.length} importieren
                 </button>
             </div>
         </div>
@@ -2841,72 +2961,80 @@ function showImportPreview(csvString) {
 
     document.body.appendChild(modal);
 
-    // Jetzt funktionieren beide Buttons + Enter-Taste
-    modal.querySelector('#cancelImportBtn').onclick = () => modal.remove();
+    const selectAll = modal.querySelector('#selectAllSimilar');
+    const checkboxes = modal.querySelectorAll('.similar-check');
+    const confirmBtn = modal.querySelector('#confirmSimilar');
 
-    modal.querySelector('#confirmImportBtn').onclick = () => {
-        modal.remove();
-        performImport(data);
+    const updateButton = () => {
+        const checked = [...checkboxes].filter(c => c.checked).length;
+        confirmBtn.textContent = checked === 0 ? 'Ohne ähnliche importieren' : `${checked} importieren`;
     };
 
-    // Enter-Taste → Importieren
-    modal.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            modal.querySelector('#confirmImportBtn').click();
-        }
-        if (e.key === 'Escape') modal.remove();
-    });
+    selectAll.onchange = () => { checkboxes.forEach(c => c.checked = selectAll.checked); updateButton(); };
+    checkboxes.forEach(c => c.onchange = updateButton);
 
-    // Fokus auf "Importieren" setzen, damit Enter sofort geht
-    modal.querySelector('#confirmImportBtn').focus();
-}
+    modal.querySelector('#cancelSimilar').onclick = () => modal.remove();
+    modal.querySelector('#confirmSimilar').onclick = () => {
+    const selected = [...checkboxes].filter(c => c.checked).map(c => parseInt(c.dataset.index));
 
-function performImport(data) {
-    let imported = 0;
-    let duplicates = 0;
+    // 1. Ganz neue Einträge (kein ähnlicher) → einfach anhängen
+    if (newOnes.length > 0) {
+        resources.push(...newOnes.map(r => ({ ...r, favorite: false })));
+    }
 
-    data.forEach(entry => {
-        const thema = entry['Thema']?.trim();
-        const fach = entry['Unterrichtsfach'] || '';
-        const klasse = entry['Klassenstufe'] || '';
-        const tool = entry['Digitales_Hilfsmittel'] || '';
+    // 2. Ähnliche Einträge → BESTEHENDE RESSOURCE ÜBERSCHREIBEN (kein push!)
+    selected.forEach(idx => {
+        const neueRessource = similarOnes[idx];
 
-        const exists = resources.some(r =>
-            r.topic === thema && r.subject === fach && r.grade === klasse && r.tool === tool
+        // Finde die EXISTIERENDE Ressource mit exakt denselben Schlüsselfeldern
+        const indexImArray = resources.findIndex(r =>
+            (r.subject || '').trim().toLowerCase() === (neueRessource.subject || '').trim().toLowerCase() &&
+            (r.grade || '').trim() === neueRessource.grade &&
+            (r.competence || '').trim().toLowerCase() === (neueRessource.competence || '').trim().toLowerCase() &&
+            (r.level || '').trim() === neueRessource.level &&
+            ((r.tool || '').trim().toLowerCase()) === ((neueRessource.tool || '').trim().toLowerCase())
         );
 
-        if (!exists && thema) {
-            resources.push({
-                topic: thema,
-                subject: fach,
-                grade: klasse,
-                competence: entry['Kompetenzbereich'] || '',
-                level: entry['Niveaustufe'] || '',
-                tool: tool,
-                description: entry['Beschreibung'] || '',
-                favorite: false
-            });
-            imported++;
-        } else if (thema) {
-            duplicates++;
+        if (indexImArray !== -1) {
+            // Bestehende Ressource aktualisieren – KEIN push!
+            resources[indexImArray] = {
+                ...resources[indexImArray],
+                topic: neueRessource.topic,
+                description: neueRessource.description,
+                tool: neueRessource.tool || resources[indexImArray].tool,
+                lastModified: new Date().toLocaleDateString('de-DE')
+            };
+        } else {
+            // Sollte nie passieren – aber zur Sicherheit
+            resources.push({ ...neueRessource, favorite: false });
         }
     });
 
+    // Alles speichern und aktualisieren
     localStorage.setItem('resources', JSON.stringify(resources));
     populateDropdowns();
     applyFilters();
     updateStats();
     updateToolFilter();
 
-    // Erfolgs-Popup
     showFancyAlert(
-        imported > 0
-            ? `${imported} Ressource${imported > 1 ? 'n' : ''} importiert!`
-            : 'Keine neuen Ressourcen importiert.',
-        imported > 0 ? 'success' : 'warning',
-        duplicates > 0 ? `${duplicates} Duplikat${duplicates > 1 ? 'e' : ''} übersprungen.` : ''
+        `${newOnes.length + selected.length} Ressource${newOnes.length + selected.length !== 1 ? 'n' : ''} importiert/aktualisiert!`,
+        'success',
+        duplicates.length > 0 ? `${duplicates.length} Duplikat${duplicates.length > 1 ? 'e' : ''} übersprungen` : ''
     );
+
+    modal.remove();
+};
+}
+
+function saveAndRefresh(imported, skipped) {
+    localStorage.setItem('resources', JSON.stringify(resources));
+    populateDropdowns();
+    applyFilters();
+    updateStats();
+    updateToolFilter();
+    showFancyAlert(`${imported} Ressource${imported !== 1 ? 'n' : ''} importiert!`, 'success',
+        skipped > 0 ? `${skipped} Duplikat${skipped > 1 ? 'e' : ''} übersprungen` : '');
 }
 
 function showFancyAlert(title, type = 'info', subtitle = '') {
