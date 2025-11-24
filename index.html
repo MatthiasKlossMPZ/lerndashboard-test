@@ -86,12 +86,12 @@
 .centered-button-wrapper {
     display: flex;
     justify-content: center;
-    margin: 6px 0 12px !important;   /* Kleiner Abstand oben/unten – einheitlich */
+    margin: 6px 0 12px !important;   
     width: 100%;
 }
 .resources-container {
-    flex: 1 1 600px;           /* Mindestbreite 600px, wächst */
-    min-width: 0;              /* Verhindert Overflow */
+    flex: 1 1 600px;          
+    min-width: 0;             
     order: 1;
 }
 
@@ -107,7 +107,7 @@
     top: 20px;
     align-self: flex-start;
     order: 2;
-    margin-left: auto; /* Schiebt Sidebar ans rechte Ende */
+    margin-left: auto; 
 }
     .sidebar h3 { margin: 0 0 16px; color: var(--primary); font-size: 16px; text-align: center; }
     .stat-bar { margin: 12px 0; }
@@ -139,7 +139,7 @@
     border-radius: 8px;
     max-height: 220px;
     overflow-y: auto;
-    z-index: 20000;               /* ← das ist der entscheidende Wert */
+    z-index: 20000;
     box-shadow: 0 10px 30px rgba(0,0,0,0.22);
     display: none;
 }
@@ -148,7 +148,7 @@
     padding: 9px 14px;
     cursor: pointer;
     border-bottom: 1px solid #eee;
-    font-size: 13.5px !important;   /* minimal kleiner + super lesbar */
+    font-size: 13.5px !important;
     line-height: 1.4;
     transition: background 0.15s ease;
 }
@@ -333,12 +333,12 @@
     /* --- SIDEBAR: KEIN STICKY MEHR, VOLLBREITE --- */
     .sidebar {
         width: 100% !important;
-        position: static !important;   /* WICHTIG: sticky deaktivieren */
+        position: static !important;
         top: auto !important;
         padding: 14px;
-        order: 2; /* Sidebar NACH Ressourcen */
+        order: 2; 
         margin-top: 10px;
-        z-index: 1; /* Sicherstellen, dass nichts überlagert */
+        z-index: 1;
     }
     .resources-container {
         order: 1;
@@ -416,7 +416,7 @@
     background: var(--card);
     box-shadow: var(--shadow);
     transition: transform 0.2s;
-    break-inside: avoid;       /* Verhindert Zeilenumbruch in Karten */
+    break-inside: avoid;
     }
     .action-icons { gap: 5px; }
     .action-icon { width: 30px; height: 30px; }
@@ -694,12 +694,6 @@ dialog#confirmDeleteDialog button[value="delete"]:hover {
 <div id="printSchoolName" style="position: fixed; bottom: 0; left: 0; font-size: 9pt; color: #666; display: none;">
     Schule: <span id="printSchoolNameText"></span>
 </div>
-<div style="background: #ff4444; color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 18px; position: fixed; top: 0; left: 0; width: 100%; z-index: 9999; box-shadow: 0 2px 10px rgba(0,0,0,0.3);">
-  TESTVERSION – nur für internen Gebrauch! (Diese Änderungen sind noch nicht live)!
-</div>
-
-<!-- Kleiner Abstand, damit der Rest nicht unter dem Banner verschwindet -->
-<div style="height: 70px;"></div>
     
     <div class="main">
         <!-- ZWEI LOGOS + TITEL -->
@@ -977,9 +971,9 @@ const REPO_PATH = (() => {
     return '/';
   }
   const path = location.pathname.split('/').filter(Boolean);
-  return location.origin + '/' + (path[0] || '') + '/';  // ← Immer mit trailing '/'
+  return location.origin + '/' + (path[0] || '') + '/';  
 })();
-console.log('Frontend REPO_PATH:', REPO_PATH);  // Debug: Sollte /lerndashboard/ sein
+console.log('Frontend REPO_PATH:', REPO_PATH);
 
 let resources = JSON.parse(localStorage.getItem('resources') || '[]');
 let tools = new Set(resources.map(r => r.tool?.trim().toLowerCase()).filter(Boolean));
@@ -1042,10 +1036,8 @@ function updateSchoolButton() {
 // Beim Laden
 document.addEventListener('DOMContentLoaded', updateSchoolButton);
 
-// Nach Änderung im Modal
 function setSchoolName() {
     const current = localStorage.getItem('schoolName') || '';
-    // ... dein bestehender Modal-Code ...
 
     // Am Ende des "Speichern"-Buttons:
     modal.querySelector('#saveSchoolBtn').onclick = () => {
@@ -1057,7 +1049,6 @@ function setSchoolName() {
         }
         updateSchoolButton();  // ← HIER AKTUALISIEREN
         document.getElementById('printSchoolNameText').textContent = getSchoolName() || 'Deine Schule';
-        // ... Modal schließen ...
     };
 }
 
@@ -1192,7 +1183,6 @@ function setFilterAndApply(filterId, value) {
     // 2. Filter-Container des betroffenen Selects finden und markieren
     const filterContainer = select.closest('.filter-container');
     if (filterContainer) {
-        // Alle anderen aktiv entfernen? Optional: nur diesen aktivieren
         document.querySelectorAll('.filter-container').forEach(fc => fc.classList.remove('active'));
         if (value) {
             filterContainer.classList.add('active');
@@ -1320,7 +1310,7 @@ function applyFilters() {
     displayResources(filtered);
     updateStats();
     updateFilterHighlight();
-    updateFilterStatus();   // ← nur noch hier, alles perfekt
+    updateFilterStatus();   
 }
 
 // ==================== AUTOCOMPLETE FÜR THEMA-SUCHE ====================
@@ -1360,7 +1350,7 @@ searchInput.addEventListener('input', () => {
       searchInput.value = topic;
       suggestionsDiv.innerHTML = '';
       suggestionsDiv.style.display = 'none';
-      applyFilters();                       // sofort filtern
+      applyFilters();
     });
 
     suggestionsDiv.appendChild(item);
@@ -1589,7 +1579,6 @@ document.head.appendChild(pwaBannerStyle);
 
 // === PWA-INSTALLATIONS-BANNER ===
 function showPWAInstallBanner() {
-    // Nur einmal pro Tag zeigen
     const lastShown = localStorage.getItem('pwaBannerLastShown');
     const now = Date.now();
     if (lastShown && (now - parseInt(lastShown)) < 86400000) return;
@@ -1800,9 +1789,6 @@ window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   installPromptEvent = e;
 
-  // Banner nur anzeigen, wenn:
-  // - Service Worker bereits aktiv ist (normale Nutzung) ODER
-  // - Es der allererste Besuch ist (noch kein localStorage-Eintrag)
   const swActive = !!navigator.serviceWorker?.controller;
   const firstVisit = !localStorage.getItem('pwaBannerLastShown');
 
@@ -2067,7 +2053,7 @@ function exportMatrixCSV() {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `${fileTitle}.csv`;  // ← Nur Matrix_2025-11-15.csv
+    link.download = `${fileTitle}.csv`;
     link.click();
 
     showFancyAlert('Matrix CSV Export erfolgreich!', 'success');
@@ -3324,7 +3310,7 @@ async function deleteResource(i) {
       dialog.style.opacity = '1';
       dialog.style.transform = 'scale(1)';
     });
-  }, 10);   // 10 ms reicht – nur damit showModal() erst fertig ist
+  }, 10);
 
   const result = await new Promise(resolve => {
     dialog.addEventListener('close', () => resolve(dialog.returnValue), { once: true });
@@ -3394,7 +3380,7 @@ function openNewResourceWindow() {
 }
 function openManual() {
     const dialog = document.createElement('dialog');
-    dialog.id = 'manualDialog';  // Für Styling
+    dialog.id = 'manualDialog';  
     dialog.style = 'width: 90%; max-width: 800px; height: 80vh; padding: 0; border-radius: 12px; box-shadow: var(--shadow); background: var(--card); position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);';
     dialog.innerHTML = `
         <iframe src="docs/Bedienungsanleitung_LernDashboard.pdf" style="width:100%; height: calc(100% - 40px); border:none;"></iframe>
