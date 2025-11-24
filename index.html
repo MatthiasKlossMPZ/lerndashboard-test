@@ -1005,7 +1005,7 @@ function openManual() {
     const dialog = document.createElement('dialog');
     dialog.style = 'width: 90%; max-width: 800px; height: 80vh; padding: 0; border-radius: 12px; box-shadow: var(--shadow);';
     dialog.innerHTML = `
-        <iframe src="https://matthiasklossmpz.github.io/lerndashboard/docs/Bedienungsanleitung_LernDashboard1_1_19.pdf" style="width:100%; height:100%; border:none;"></iframe>
+        <iframe src="https://matthiasklossmpz.github.io/lerndashboard/docs/Bedienungsanleitung_LernDashboard.pdf" style="width:100%; height:100%; border:none;"></iframe>
         <button onclick="this.parentNode.close()" style="position:absolute; top:10px; right:10px; background:var(--primary); color:white; padding:8px 16px; border:none; border-radius:8px; cursor:pointer;">Schließen</button>`;
     document.body.appendChild(dialog);
     dialog.showModal();
@@ -3372,7 +3372,7 @@ function openManual() {
     dialog.id = 'manualDialog';  // Für Styling
     dialog.style = 'width: 90%; max-width: 800px; height: 80vh; padding: 0; border-radius: 12px; box-shadow: var(--shadow); background: var(--card); position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);';
     dialog.innerHTML = `
-        <iframe src="docs/Bedienungsanleitung_LernDashboard1_1_19.pdf" style="width:100%; height: calc(100% - 40px); border:none;"></iframe>
+        <iframe src="docs/Bedienungsanleitung_LernDashboard.pdf" style="width:100%; height: calc(100% - 40px); border:none;"></iframe>
         <button onclick="this.parentNode.close()" style="position:absolute; bottom:10px; right:10px; background:var(--primary); color:white; padding:8px 16px; border:none; border-radius:8px; cursor:pointer; font-weight:600;">Schließen</button>`;
     document.body.appendChild(dialog);
     dialog.showModal();
