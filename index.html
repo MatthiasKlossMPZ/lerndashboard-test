@@ -969,7 +969,7 @@ function updateCurrentFilters() {
 }
 
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-const VERSION = '1.1.15';
+const VERSION = '1.1.16';
 const REPO_PATH = (() => {
   if (location.hostname === 'localhost' || 
       location.hostname === '127.0.0.1' || 
@@ -2932,9 +2932,36 @@ function showSimilarDecisionDialog(newOnes, similarOnes, duplicates) {
         </th>
         <th style="padding:12px;">Neues Thema</th>
         <th style="padding:12px;">Vorhandenes Thema</th>
-        <th style="padding:12px;width:48%;">Unterschied</th>
+        <th style="padding:12px;width:35%;">Unterschied</th>
+        <th style="padding:12px;font-size:13px;text-align:center;">Gemeinsamkeiten</th>
     </tr>
 </thead>
+<tbody>
+    ${similarOnes.map((s, i) => `
+        <tr style="border-bottom:1px solid #eee;">
+            <td style="padding:10px;text-align:center;">
+                <input type="checkbox" class="import-check" data-index="${i}" checked>
+            </td>
+            <td style="padding:10px;text-align:center;">
+                <input type="checkbox" class="replace-check" data-index="${i}">
+            </td>
+            <td style="padding:10px;color:#27ae60;font-weight:600;">${escapeHtml(s.topic)}</td>
+            <td style="padding:10px;color:#e74c3c;">${escapeHtml(s.existing.topic)}</td>
+            <td style="padding:10px;font-size:13px;line-height:1.5;">
+                ${s.description !== s.existing.description 
+                    ? `<strong style="color:#e67e22;">Beschreibung geändert</strong><br>
+                       <small style="color:#27ae60;">Neu: ${escapeHtml((s.description || '–').substring(0,120))}${s.description?.length > 120 ? '…' : ''}</small><br>
+                       <small style="color:#e74c3c;">Alt: ${escapeHtml((s.existing.description || '–').substring(0,120))}${s.existing.description?.length > 120 ? '…' : ''}</small>`
+                    : '<span style="color:#999;">Beschreibung identisch</span>'
+                }
+            </td>
+            <td style="padding:8px;font-size:12px;color:#555;line-height:1.5;text-align:left;">
+                ${escapeHtml(s.subject)} • ${escapeHtml(s.grade)} • ${escapeHtml(s.competence)} • ${escapeHtml(s.level)}<br>
+                ${s.tool ? escapeHtml(s.tool) : '<span style="color:#aaa;">– kein Tool</span>'}
+            </td>
+        </tr>
+    `).join('')}
+</tbody>
                     <tbody>
                         ${similarOnes.map((s, i) => `
                             <tr style="border-bottom:1px solid #eee;">
@@ -2954,6 +2981,9 @@ function showSimilarDecisionDialog(newOnes, similarOnes, duplicates) {
                                         : '<span style="color:#999;">Beschreibung identisch</span>'
                                     }
                                 </td>
+                                <td style="padding:10px;font-size:12px;color:#555;line-height:1.4;">
+    ${escapeHtml(s.subject)} • ${escapeHtml(s.grade)} • ${escapeHtml(s.competence)} • ${escapeHtml(s.level)} • ${escapeHtml(s.tool || '–')}
+</td>
                             </tr>
                         `).join('')}
                     </tbody>
