@@ -969,7 +969,7 @@ function updateCurrentFilters() {
 }
 
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-const VERSION = '1.1.19';
+const VERSION = '1.1.20';
 const REPO_PATH = (() => {
   if (location.hostname === 'localhost' || 
       location.hostname === '127.0.0.1' || 
@@ -2890,85 +2890,103 @@ const similarMatch = resources.find(r =>
         }
     });
 
-    if (similar.length === 0) {
-        if (toImport.length > 0) {
-            resources.push(...toImport.map(r => ({ ...r, favorite: false })));
-            saveAndRefresh(toImport.length, duplicates.length);
-        } else {
-            showFancyAlert('Keine neuen Ressourcen gefunden.', 'info');
-        }
+    // Ein einziger Dialog für alle Fälle
+showUnifiedImportDecisionDialog(toImport, similar, duplicates.length);
+return;
+}
+
+// === NEUE EINHEITLICHE IMPORT-ENTSCHEIDUNGSMASKe (ersetzt die alte showSimilarDecisionDialog) ===
+function showUnifiedImportDecisionDialog(newOnes, similarOnes, duplicateCount = 0) {
+    const totalNew = newOnes.length;
+    const totalSimilar = similarOnes.length;
+    const totalToShow = totalNew + totalSimilar;
+
+    if (totalToShow === 0) {
+        showFancyAlert('Keine neuen oder ähnlichen Einträge gefunden.', 'info');
         return;
     }
 
-    showSimilarDecisionDialog(toImport, similar, duplicates);
-}
-
-function showSimilarDecisionDialog(newOnes, similarOnes, duplicates) {
     const modal = document.createElement('div');
     modal.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;
         background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);
         display:flex;justify-content:center;align-items:center;z-index:20000;padding:20px;`;
-    
+
     modal.innerHTML = `
-        <div style="background:var(--card);padding:28px;border-radius:16px;max-width:1100px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
-            <h3 style="margin:0 0 16px;color:var(--text);font-size:20px;">Ähnliche Einträge – bitte entscheiden</h3>
-            <p style="margin:0 0 16px;color:var(--text-light);font-size:15px;">
-                <strong>${newOnes.length}</strong> komplett neue • 
-                <strong>${duplicates.length}</strong> exakte Duplikate • 
-                <strong>${similarOnes.length}</strong> ähnliche Einträge
+        <div style="background:var(--card);padding:28px;border-radius:16px;max-width:1160px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+            <h3 style="margin:0 0 16px;color:var(--text);font-size:20px;">Import abschließen</h3>
+            <p style="margin:0 0 20px;color:var(--text-light);font-size:15px;line-height:1.5;">
+                <strong>${totalNew}</strong> komplett neue ${totalNew === 1 ? 'Ressource' : 'Ressourcen'} • 
+                <strong>${totalSimilar}</strong> ähnliche ${totalSimilar === 1 ? 'Ressource' : 'Ressourcen'} • 
+                <strong>${duplicateCount}</strong> exakte ${duplicateCount === 1 ? 'Duplikat' : 'Duplikate'} ${duplicateCount > 0 ? 'wird übersprungen' : ''}
             </p>
 
-            <div style="max-height:520px;overflow-y:auto;border:1px solid #ddd;border-radius:8px;">
+            <div style="max-height:540px;overflow-y:auto;border:1px solid #ddd;border-radius:8px;">
                 <table style="width:100%;border-collapse:collapse;font-size:14px;">
                     <thead style="background:#6b46c1;color:white;position:sticky;top:0;z-index:10;">
-    <tr>
-        <th style="padding:12px;width:70px;text-align:center;font-size:13px;">
-            Importieren?<br>
-            <input type="checkbox" id="importAll" checked style="width:18px;height:18px;margin-top:4px;">
-        </th>
-        <th style="padding:12px;width:90px;text-align:center;font-size:13px;">
-            Überschreiben?<br>
-            <input type="checkbox" id="replaceAll" style="width:18px;height:18px;margin-top:4px;">
-        </th>
-        <th style="padding:12px;">Neues Thema</th>
-        <th style="padding:12px;">Vorhandenes Thema</th>
-        <th style="padding:12px;width:35%;">Unterschied</th>
-        <th style="padding:12px;font-size:13px;text-align:center;">Gemeinsamkeiten</th>
-    </tr>
-</thead>
-<tbody>
-    ${similarOnes.map((s, i) => `
-        <tr style="border-bottom:1px solid #eee;">
-            <td style="padding:10px;text-align:center;">
-                <input type="checkbox" class="import-check" data-index="${i}" checked>
-            </td>
-            <td style="padding:10px;text-align:center;">
-                <input type="checkbox" class="replace-check" data-index="${i}">
-            </td>
-            <td style="padding:10px;color:#27ae60;font-weight:600;">${escapeHtml(s.topic)}</td>
-            <td style="padding:10px;color:#e74c3c;">${escapeHtml(s.existing.topic)}</td>
-            <td style="padding:10px;font-size:13px;line-height:1.5;">
-                ${s.description !== s.existing.description 
-                    ? `<strong style="color:#e67e22;">Beschreibung geändert</strong><br>
-                       <small style="color:#27ae60;">Neu: ${escapeHtml((s.description || '–').substring(0,120))}${s.description?.length > 120 ? '…' : ''}</small><br>
-                       <small style="color:#e74c3c;">Alt: ${escapeHtml((s.existing.description || '–').substring(0,120))}${s.existing.description?.length > 120 ? '…' : ''}</small>`
-                    : '<span style="color:#999;">Beschreibung identisch</span>'
-                }
-            </td>
-            <td style="padding:8px;font-size:12px;color:#555;line-height:1.5;text-align:left;">
-                ${escapeHtml(s.subject)} • ${escapeHtml(s.grade)} • ${escapeHtml(s.competence)} • ${escapeHtml(s.level)}<br>
-                ${s.tool ? escapeHtml(s.tool) : '<span style="color:#aaa;">– kein Tool</span>'}
-            </td>
-        </tr>
-    `).join('')}
-</tbody>
+                        <tr>
+                            <th style="padding:12px;width:80px;text-align:center;">
+                                Importieren?<br>
+                                <input type="checkbox" id="importAll" checked style="width:18px;height:18px;margin-top:4px;">
+                            </th>
+                            <th style="padding:12px;width:100px;text-align:center;">
+                                Überschreiben?<br>
+                                <input type="checkbox" id="replaceAll" style="width:18px;height:18px;margin-top:4px;">
+                            </th>
+                            <th style="padding:12px;">Thema</th>
+                            <th style="padding:12px;width:38%;">Unterschied / Hinweis</th>
+                            <th style="padding:12px;font-size:13px;">Fach • Klasse • Kompetenz • Tool</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- 1) Komplett neue Einträge -->
+                        ${newOnes.map((n, i) => `
+                            <tr style="background:#f8fff8;">
+                                <td style="padding:10px;text-align:center;">
+                                    <input type="checkbox" class="import-check new-check" data-index="${i}" checked>
+                                </td>
+                                <td style="padding:10px;text-align:center;color:#aaa;">–</td>
+                                <td style="padding:10px;font-weight:600;color:#27ae60;">${escapeHtml(n.topic)}</td>
+                                <td style="padding:10px;color:#27ae60;font-style:italic;">wird neu hinzugefügt</td>
+                                <td style="padding:10px;font-size:13px;color:#555;">
+                                    ${escapeHtml(n.subject)} • ${n.grade} • ${escapeHtml(n.competence)} • ${n.tool || '–'}
+                                </td>
+                            </tr>
+                        `).join('')}
+
+                        <!-- 2) Ähnliche Einträge -->
+                        ${similarOnes.map((s, i) => `
+                            <tr style="border-top:2px solid #ddd;">
+                                <td style="padding:10px;text-align:center;">
+                                    <input type="checkbox" class="import-check similar-check" data-index="${i}" checked>
+                                </td>
+                                <td style="padding:10px;text-align:center;">
+                                    <input type="checkbox" class="replace-check" data-index="${i}">
+                                </td>
+                                <td style="padding:10px;font-weight:600;color:#27ae60;">${escapeHtml(s.topic)}</td>
+                                <td style="padding:10px;line-height:1.5;">
+                                    ${s.description !== s.existing.description 
+                                        ? `<strong style="color:#e67e22;">Beschreibung geändert</strong><br>
+                                           <small style="color:#27ae60;">${escapeHtml((s.description||'–').substring(0,100))}${s.description?.length>100?'…':''}</small><br>
+                                           <small style="color:#e74c3c;">${escapeHtml((s.existing.description||'–').substring(0,100))}${s.existing.description?.length>100?'…':''}</small>`
+                                        : s.tool !== s.existing.tool 
+                                            ? `<strong style="color:#e67e22;">Tool geändert</strong>: ${escapeHtml(s.tool||'–')} → ${escapeHtml(s.existing.tool||'–')}`
+                                            : '<span style="color:#999;">nur Kleinigkeiten geändert</span>'
+                                    }
+                                </td>
+                                <td style="padding:10px;font-size:13px;color:#555;">
+                                    ${escapeHtml(s.subject)} • ${s.grade} • ${escapeHtml(s.competence)} • ${s.tool || '–'}<br>
+                                    <small style="color:#e74c3c;">bestehend: ${escapeHtml(s.existing.topic)}</small>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
                 </table>
             </div>
 
-            <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px;">
-                <button id="cancelSimilar" style="padding:10px 20px;border:1px solid #ccc;border-radius:10px;background:#f0f0f0;">Abbrechen</button>
-                <button id="confirmSimilar" style="padding:10px 32px;background:var(--primary);color:white;border:none;border-radius:10px;font-weight:700;">
-                    Importieren
+            <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:24px;">
+                <button id="cancelImport" style="padding:10px 20px;border:1px solid #ccc;border-radius:10px;background:#f0f0f0;">Abbrechen</button>
+                <button id="confirmImport" style="padding:12px 36px;background:var(--primary);color:white;border:none;border-radius:10px;font-weight:700;font-size:16px;">
+                    ${totalNew + totalSimilar} importieren
                 </button>
             </div>
         </div>
@@ -2980,128 +2998,86 @@ function showSimilarDecisionDialog(newOnes, similarOnes, duplicates) {
     const replaceAll = modal.querySelector('#replaceAll');
     const importChecks = modal.querySelectorAll('.import-check');
     const replaceChecks = modal.querySelectorAll('.replace-check');
+    const confirmBtn = modal.querySelector('#confirmImport');
 
-    // Funktion: Alle Checkboxes aktualisieren
-    const syncAllChecks = () => {
-        const importedCount = [...importChecks].filter(c => c.checked).length;
-        const replaceableCount = importedCount; // Nur bei importierten
-        const replacedCount = [...replaceChecks].filter(c => c.checked).length;
-
-        // Links "All" updaten
-        importAll.checked = importedCount === similarOnes.length;
-        importAll.indeterminate = importedCount > 0 && importedCount < similarOnes.length;
-
-        // Rechts "All" updaten
-        replaceAll.disabled = importedCount === 0;
-        replaceAll.checked = replacedCount === replaceableCount && replaceableCount > 0;
-        replaceAll.indeterminate = replacedCount > 0 && replacedCount < replaceableCount;
-
-        // Button-Text updaten
-        const btn = modal.querySelector('#confirmSimilar');
-        if (importedCount === 0) {
-            btn.textContent = 'Nichts importieren';
-        } else if (replacedCount === importedCount) {
-            btn.textContent = `${importedCount} überschreiben`;
-        } else if (replacedCount === 0) {
-            btn.textContent = `${importedCount} neu hinzufügen`;
+    const updateButtonText = () => {
+        const importing = [...importChecks].filter(c => c.checked).length;
+        const replacing = [...replaceChecks].filter(c => c.checked).length;
+        if (importing === 0) {
+            confirmBtn.textContent = 'Nichts importieren';
+        } else if (replacing === importing) {
+            confirmBtn.textContent = `${importing} überschreiben`;
         } else {
-            btn.textContent = `${replacedCount} überschreiben • ${importedCount - replacedCount} neu`;
+            confirmBtn.textContent = `${importing} hinzufügen${replacing > 0 ? ` • ${replacing} überschreiben` : ''}`;
         }
     };
 
-    // Jede linke Checkbox: Beeinflusst rechte
-    importChecks.forEach((importChk, i) => {
-        const replaceChk = replaceChecks[i];
-        importChk.onchange = () => {
-            replaceChk.disabled = !importChk.checked;
-            if (!importChk.checked) {
-                replaceChk.checked = false;
-                replaceChk.indeterminate = false;
-            }
-            syncAllChecks();
+    importChecks.forEach(chk => {
+        chk.onchange = () => {
+            const idx = chk.dataset.index;
+            const isSimilar = chk.classList.contains('similar-check');
+            const replaceChk = isSimilar ? replaceChecks[idx] : null;
+            if (replaceChk) replaceChk.disabled = !chk.checked;
+            if (!chk.checked && replaceChk) replaceChk.checked = false;
+            importAll.checked = [...importChecks].every(c => c.checked);
+            importAll.indeterminate = [...importChecks].some(c => c.checked) && !importAll.checked;
+            updateButtonText();
         };
     });
 
-    // Rechte Checkboxen: Nur bei aktiviertem links
-    replaceChecks.forEach((replaceChk, i) => {
-        const importChk = importChecks[i];
-        replaceChk.onchange = () => {
-            if (replaceChk.disabled) {
-                replaceChk.checked = false;
-                return;
-            }
-            syncAllChecks();
-        };
-    });
+    replaceChecks.forEach(chk => chk.onchange = updateButtonText);
 
-    // "All importieren" (links oben)
     importAll.onchange = () => {
-        const allChecked = importAll.checked;
+        const checked = importAll.checked;
         importChecks.forEach((chk, i) => {
-            chk.checked = allChecked;
-            replaceChecks[i].disabled = !allChecked;
-            if (!allChecked) {
-                replaceChecks[i].checked = false;
-                replaceChecks[i].indeterminate = false;
-            }
+            chk.checked = checked;
+            if (!checked && replaceChecks[i]) replaceChecks[i].checked = false;
+            if (replaceChecks[i]) replaceChecks[i].disabled = !checked;
         });
-        syncAllChecks();
+        updateButtonText();
     };
 
-    // "All überschreiben" (rechts oben)
     replaceAll.onchange = () => {
         if (replaceAll.disabled) return;
-        const allReplaceChecked = replaceAll.checked;
-        importChecks.forEach((importChk, i) => {
-            if (importChk.checked) {
-                replaceChecks[i].checked = allReplaceChecked;
-                replaceChecks[i].indeterminate = false;
-            }
+        const checked = replaceAll.checked;
+        replaceChecks.forEach((chk, i) => {
+            if (importChecks[i].checked) chk.checked = checked;
         });
-        syncAllChecks();
+        updateButtonText();
     };
 
-    // Initial sync
-    syncAllChecks();
+    // Initial
+    updateButtonText();
 
-    // Cancel
-    modal.querySelector('#cancelSimilar').onclick = () => modal.remove();
+    modal.querySelector('#cancelImport').onclick = () => modal.remove();
 
-    // Confirm
-    modal.querySelector('#confirmSimilar').onclick = () => {
-        const importIndices = [...importChecks].filter(c => c.checked).map(c => parseInt(c.dataset.index));
-        const replaceIndices = [...replaceChecks].filter(c => c.checked).map(c => parseInt(c.dataset.index));
-
-        // Neue Einträge (nicht ähnliche)
-        if (newOnes.length > 0) {
-            resources.push(...newOnes.map(r => ({ ...r, favorite: false })));
-        }
-
-        // Überschreiben (rechts gesetzt)
-        replaceIndices.forEach(idx => {
-            const neu = similarOnes[idx];
-            const index = resources.findIndex(r =>
-                (r.subject || '').trim().toLowerCase() === (neu.subject || '').trim().toLowerCase() &&
-                (r.grade || '').trim() === neu.grade &&
-                (r.competence || '').trim().toLowerCase() === (neu.competence || '').trim().toLowerCase() &&
-                (r.level || '').trim() === neu.level &&
-                ((r.tool || '').trim().toLowerCase()) === ((neu.tool || '').trim().toLowerCase())
-            );
-            if (index !== -1) {
-                resources[index] = { 
-                    ...resources[index], 
-                    topic: neu.topic,
-                    description: neu.description,
-                    tool: neu.tool,
-                    lastModified: new Date().toLocaleDateString('de-DE')
-                };
+    modal.querySelector('#confirmImport').onclick = () => {
+        // Neue hinzufügen (immer wenn Checkbox an)
+        newOnes.forEach((n, i) => {
+            if (modal.querySelector(`.new-check[data-index="${i}"]`).checked) {
+                resources.push({ ...n, favorite: false });
             }
         });
 
-        // Neu hinzufügen (links gesetzt, aber nicht rechts)
-        importIndices.forEach(idx => {
-            if (!replaceIndices.includes(idx)) {
-                resources.push({ ...similarOnes[idx], favorite: false });
+        // Ähnliche: Überschreiben oder neu hinzufügen
+        similarOnes.forEach((s, i) => {
+            const importChk = modal.querySelector(`.similar-check[data-index="${i}"]`);
+            const replaceChk = replaceChecks[i];
+            if (!importChk.checked) return;
+
+            if (replaceChk.checked) {
+                const idx = resources.findIndex(r => 
+                    r.subject?.trim().toLowerCase() === s.subject?.trim().toLowerCase() &&
+                    r.grade === s.grade &&
+                    r.competence?.trim().toLowerCase() === s.competence?.trim().toLowerCase() &&
+                    r.level === s.level &&
+                    (r.tool || '').trim().toLowerCase() === (s.tool || '').trim().toLowerCase()
+                );
+                if (idx !== -1) {
+                    resources[idx] = { ...resources[idx], ...s, lastModified: new Date().toLocaleDateString('de-DE') };
+                }
+            } else {
+                resources.push({ ...s, favorite: false });
             }
         });
 
@@ -3111,7 +3087,7 @@ function showSimilarDecisionDialog(newOnes, similarOnes, duplicates) {
         updateStats();
         updateToolFilter();
 
-        showFancyAlert('Import abgeschlossen!', 'success');
+        showFancyAlert('Import erfolgreich abgeschlossen!', 'success');
         modal.remove();
     };
 }
