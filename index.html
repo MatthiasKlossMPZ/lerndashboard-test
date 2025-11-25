@@ -969,7 +969,7 @@ function updateCurrentFilters() {
 }
 
 // === GLOBALE VARIABLEN (EINZIGER ORT!) ===
-const VERSION = '1.1.20';
+const VERSION = '1.1.25';
 const REPO_PATH = (() => {
   if (location.hostname === 'localhost' || 
       location.hostname === '127.0.0.1' || 
@@ -982,6 +982,7 @@ const REPO_PATH = (() => {
 console.log('Frontend REPO_PATH:', REPO_PATH);  // Debug: Sollte /lerndashboard/ sein
 
 let resources = JSON.parse(localStorage.getItem('resources') || '[]');
+let undoStack = JSON.parse(localStorage.getItem('undoStack') || '[]'); // neu!
 let tools = new Set(resources.map(r => r.tool?.trim().toLowerCase()).filter(Boolean));
 let dropdownsInitialized = false;
 
@@ -3001,16 +3002,34 @@ function showUnifiedImportDecisionDialog(newOnes, similarOnes, duplicateCount = 
     const confirmBtn = modal.querySelector('#confirmImport');
 
     const updateButtonText = () => {
-        const importing = [...importChecks].filter(c => c.checked).length;
-        const replacing = [...replaceChecks].filter(c => c.checked).length;
-        if (importing === 0) {
-            confirmBtn.textContent = 'Nichts importieren';
-        } else if (replacing === importing) {
-            confirmBtn.textContent = `${importing} überschreiben`;
-        } else {
-            confirmBtn.textContent = `${importing} hinzufügen${replacing > 0 ? ` • ${replacing} überschreiben` : ''}`;
-        }
-    };
+    const importingNew = newOnes.filter((n, i) => 
+        modal.querySelector(`.new-check[data-index="${i}"]`)?.checked
+    ).length;
+
+    const importingSimilarAsNew = similarOnes.filter((s, i) => {
+        const importChk = modal.querySelector(`.similar-check[data-index="${i}"]`);
+        const replaceChk = replaceChecks[i];
+        return importChk?.checked && !replaceChk?.checked;
+    }).length;
+
+    const overwriting = similarOnes.filter((s, i) => {
+        const importChk = modal.querySelector(`.similar-check[data-index="${i}"]`);
+        const replaceChk = replaceChecks[i];
+        return importChk?.checked && replaceChk?.checked;
+    }).length;
+
+    const totalAdded = importingNew + importingSimilarAsNew;
+
+    if (totalAdded === 0 && overwriting === 0) {
+        confirmBtn.textContent = 'Nichts importieren';
+    } else if (overwriting === 0) {
+        confirmBtn.textContent = `${totalAdded} hinzufügen`;
+    } else if (totalAdded === 0) {
+        confirmBtn.textContent = `${overwriting} überschreiben`;
+    } else {
+        confirmBtn.textContent = `${totalAdded} hinzufügen • ${overwriting} überschreiben`;
+    }
+};
 
     importChecks.forEach(chk => {
         chk.onchange = () => {
@@ -3051,59 +3070,243 @@ function showUnifiedImportDecisionDialog(newOnes, similarOnes, duplicateCount = 
 
     modal.querySelector('#cancelImport').onclick = () => modal.remove();
 
-    modal.querySelector('#confirmImport').onclick = () => {
-        // Neue hinzufügen (immer wenn Checkbox an)
-        newOnes.forEach((n, i) => {
-            if (modal.querySelector(`.new-check[data-index="${i}"]`).checked) {
-                resources.push({ ...n, favorite: false });
+modal.querySelector('#confirmImport').onclick = () => {
+    // 1. Backup vor allen Änderungen!
+    const backupBeforeImport = JSON.parse(JSON.stringify(resources));
+
+    // 2. Änderungen durchführen
+    newOnes.forEach((n, i) => {
+        if (modal.querySelector(`.new-check[data-index="${i}"]`)?.checked) {
+            resources.push({ ...n, favorite: false });
+        }
+    });
+
+    similarOnes.forEach((s, i) => {
+        const importChk = modal.querySelector(`.similar-check[data-index="${i}"]`);
+        const replaceChk = replaceChecks[i];
+        if (!importChk?.checked) return;
+
+        if (replaceChk?.checked) {
+            const idx = resources.findIndex(r =>
+                r.subject?.trim().toLowerCase() === s.subject?.trim().toLowerCase() &&
+                r.grade === s.grade &&
+                r.competence?.trim().toLowerCase() === s.competence?.trim().toLowerCase() &&
+                r.level === s.level &&
+                (r.tool || '').trim().toLowerCase() === (s.tool || '').trim().toLowerCase()
+            );
+            if (idx !== -1) {
+                resources[idx] = { ...resources[idx], ...s, lastModified: new Date().toLocaleDateString('de-DE') };
             }
-        });
+        } else {
+            resources.push({ ...s, favorite: false });
+        }
+    });
 
-        // Ähnliche: Überschreiben oder neu hinzufügen
-        similarOnes.forEach((s, i) => {
-            const importChk = modal.querySelector(`.similar-check[data-index="${i}"]`);
-            const replaceChk = replaceChecks[i];
-            if (!importChk.checked) return;
+    // 3. GENAU ZÄHLEN: Was wurde wirklich gemacht?
+    const newAdded = newOnes.filter((n, i) => 
+        modal.querySelector(`.new-check[data-index="${i}"]`)?.checked
+    ).length;
 
-            if (replaceChk.checked) {
-                const idx = resources.findIndex(r => 
-                    r.subject?.trim().toLowerCase() === s.subject?.trim().toLowerCase() &&
-                    r.grade === s.grade &&
-                    r.competence?.trim().toLowerCase() === s.competence?.trim().toLowerCase() &&
-                    r.level === s.level &&
-                    (r.tool || '').trim().toLowerCase() === (s.tool || '').trim().toLowerCase()
-                );
-                if (idx !== -1) {
-                    resources[idx] = { ...resources[idx], ...s, lastModified: new Date().toLocaleDateString('de-DE') };
-                }
-            } else {
-                resources.push({ ...s, favorite: false });
-            }
-        });
+    const similarAddedAsNew = similarOnes.filter((s, i) => {
+        const importChk = modal.querySelector(`.similar-check[data-index="${i}"]`);
+        const replaceChk = replaceChecks[i];
+        return importChk?.checked && !replaceChk?.checked;
+    }).length;
 
-        localStorage.setItem('resources', JSON.stringify(resources));
-        populateDropdowns();
-        applyFilters();
-        updateStats();
-        updateToolFilter();
+    const overwritten = similarOnes.filter((s, i) => {
+        const importChk = modal.querySelector(`.similar-check[data-index="${i}"]`);
+        const replaceChk = replaceChecks[i];
+        return importChk?.checked && replaceChk?.checked;
+    }).length;
 
-        showFancyAlert('Import erfolgreich abgeschlossen!', 'success');
-        modal.remove();
-    };
-}
+    const totalNew = newAdded + similarAddedAsNew;
 
-function saveAndRefresh(imported, skipped) {
+    // 4. Sofort speichern
     localStorage.setItem('resources', JSON.stringify(resources));
+
+    // 5. Undo-Eintrag mit korrektem Backup
+    const undoEntry = {
+        action: 'import',
+        timestamp: Date.now(),
+        resourcesBackup: backupBeforeImport,
+        message: totalNew > 0 && overwritten > 0 
+            ? `${totalNew} hinzugefügt, ${overwritten} überschrieben`
+            : totalNew > 0 ? `${totalNew} hinzugefügt` 
+            : `${overwritten} überschrieben`
+    };
+    undoStack.unshift(undoEntry);
+    if (undoStack.length > 15) undoStack.pop();
+    localStorage.setItem('undoStack', JSON.stringify(undoStack));
+
+    // 6. UI aktualisieren
     populateDropdowns();
     applyFilters();
     updateStats();
     updateToolFilter();
-    showFancyAlert(`${imported} Ressource${imported !== 1 ? 'n' : ''} importiert!`, 'success',
-        skipped > 0 ? `${skipped} Duplikat${skipped > 1 ? 'e' : ''} übersprungen` : '');
+
+    // 7. PERFEKTE ERFOLGSMELDUNG
+    let title = 'Fertig!';
+    let subtitle = '';
+
+    if (totalNew > 0 && overwritten > 0) {
+        subtitle = `<strong style="color:#27ae60;">${totalNew} neue Einträge</strong> hinzugefügt • <strong style="color:#e67e22;">${overwritten} überschrieben</strong>`;
+    } else if (totalNew > 0) {
+        title = `${totalNew} Ressource${totalNew !== 1 ? 'n' : ''} importiert!`;
+        subtitle = 'Erfolgreich hinzugefügt';
+    } else if (overwritten > 0) {
+        title = `${overwritten} Ressource${overwritten !== 1 ? 'n' : ''} aktualisiert!`;
+        subtitle = 'Bestehende Einträge wurden überschrieben';
+    } else {
+        title = 'Keine Änderungen';
+        subtitle = 'Alles wurde übersprungen';
+    }
+
+    if (duplicateCount > 0) {
+        subtitle += `<br><small style="color:#e74c3c;">${duplicateCount} exakte Duplikate ignoriert</small>`;
+    }
+
+    showFancyAlert(
+        title,
+        'success',
+        subtitle,
+        () => showUndoToast('Import rückgängig machen')
+    );
+
+    modal.remove();
+};
 }
 
-function showFancyAlert(title, type = 'info', subtitle = '') {
-    // Alte Popups entfernen
+function saveAndRefresh(imported = 0, skipped = 0) {
+    populate_dropdowns();
+    applyFilters();
+    updateStats();
+    updateToolFilter();
+
+    // === EXAKTE ZÄHLUNG: Was wurde wirklich gemacht? ===
+const newAdded = newOnes.filter((n, i) => 
+    modal.querySelector(`.new-check[data-index="${i}"]`)?.checked
+).length;
+
+const similarAddedAsNew = similarOnes.filter((s, i) => {
+    const importChk = modal.querySelector(`.similar-check[data-index="${i}"]`);
+    const replaceChk = replaceChecks[i];
+    return importChk?.checked && !replaceChk?.checked;
+}).length;
+
+const overwritten = similarOnes.filter((s, i) => {
+    const importChk = modal.querySelector(`.similar-check[data-index="${i}"]`);
+    const replaceChk = replaceChecks[i];
+    return importChk?.checked && replaceChk?.checked;
+}).length;
+
+const totalNew = newAdded + similarAddedAsNew;
+
+// === KLARER, EHRLICHER TEXT ===
+let title = 'Fertig!';
+let subtitle = '';
+
+if (totalNew > 0 && overwritten > 0) {
+    subtitle = `<strong style="color:#27ae60;">${totalNew} neue Einträge</strong> hinzugefügt • <strong style="color:#e67e22;">${overwritten} überschrieben</strong>`;
+} else if (totalNew > 0) {
+    title = `${totalNew} Ressource${totalNew !== 1 ? 'n' : ''} importiert!`;
+    subtitle = 'Erfolgreich hinzugefügt';
+} else if (overwritten > 0) {
+    title = `${overwritten} Ressource${overwritten !== 1 ? 'n' : ''} aktualisiert!`;
+    subtitle = 'Bestehende Einträge wurden überschrieben';
+} else {
+    title = 'Keine Änderungen';
+    subtitle = 'Alles war bereits vorhanden oder wurde deaktiviert';
+}
+
+// Duplikate hinzufügen (wenn vorhanden)
+if (duplicateCount > 0) {
+    subtitle += `<br><small style="color:#e74c3c;">${duplicateCount} exakte Duplikat${duplicateCount !== 1 ? 'e' : ''} ignoriert</small>`;
+}
+
+// === ENDGÜLTIGER ERFOLGS-POPUP ===
+showFancyAlert(
+    title,
+    'success',
+    subtitle,
+    () => showUndoToast('Import rückgängig machen')
+);
+}
+
+// ============================================================
+// UNDO-SYSTEM – zentraler Toast + Rückgängig-Funktion
+// ============================================================
+
+function showUndoToast(message) {
+    // Alten Toast entfernen (falls noch da)
+    const old = document.getElementById('undoToast');
+    if (old) old.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'undoToast';
+    toast.style.cssText = `
+        position:fixed;bottom:24px;right:24px;z-index:40000;
+        background:var(--card);color:var(--text);padding:14px 20px;
+        border-radius:12px;box-shadow:0 8px 25px rgba(0,0,0,0.25);
+        display:flex;align-items:center;gap:16px;
+        font-size:15px;font-weight:600;
+        animation:slideUp 0.4s ease;
+        border-left:5px solid #27ae60;
+        max-width:90%;
+    `;
+
+    toast.innerHTML = `
+        <span>${message}</span>
+        <button onclick="undoLastAction()" style="
+            background:var(--primary);color:white;border:none;
+            padding:8px 18px;border-radius:10px;font-weight:700;
+            cursor:pointer;font-size:14px;white-space:nowrap;
+        ">
+            Rückgängig
+        </button>
+    `;
+
+    document.body.appendChild(toast);
+
+    // Auto-verbergen nach 8 Sekunden
+    setTimeout(() => {
+        if (toast && toast.parentNode) {
+            toast.style.animation = 'slideUp 0.4s ease reverse';
+            setTimeout(() => toast.remove(), 400);
+        }
+    }, 8000);
+}
+
+function undoLastAction() {
+    if (undoStack.length === 0) {
+        showFancyAlert('Nichts zum Rückgängigmachen.', 'info');
+        return;
+    }
+
+    const last = undoStack.shift();           // letzten Eintrag entfernen
+    resources = last.resourcesBackup;         // alten Zustand wiederherstellen
+
+    // Alles wieder speichern
+    localStorage.setItem('resources', JSON.stringify(resources));
+    localStorage.setItem('undoStack', JSON.stringify(undoStack));
+
+    // UI aktualisieren
+    populateDropdowns();
+    applyFilters();
+    updateStats();
+    updateToolFilter();
+
+    // Erfolgsmeldung
+    showFancyAlert('Rückgängig gemacht!', 'success');
+
+    // Toast entfernen
+    const toast = document.getElementById('undoToast');
+    if (toast) toast.remove();
+}
+
+
+
+function showFancyAlert(title, type = 'info', subtitle = '', onClose = null) {
+    // Alte entfernen
     document.querySelectorAll('[data-fancy-alert]').forEach(m => m.remove());
 
     const modal = document.createElement('div');
@@ -3118,62 +3321,47 @@ function showFancyAlert(title, type = 'info', subtitle = '') {
     const colors = { success: '#27ae60', warning: '#f39c12', info: '#6b46c1', error: '#e74c3c' };
 
     modal.innerHTML = `
-        <div id="fancyDialog" role="dialog" aria-modal="true" tabindex="-1"
-             style="background:var(--card);padding:32px;border-radius:16px;text-align:center;
-                    max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.4);
-                    outline:none;">
+        <div id="fancyDialog" style="background:var(--card);padding:32px;border-radius:16px;text-align:center;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
             <div style="margin:0 auto 20px;width:70px;height:70px;">
                 <svg width="70" height="70" viewBox="0 0 100 100">
                     <circle cx="50" cy="50" r="44" fill="none" stroke="#e0e0e0" stroke-width="4"/>
-                    <circle cx="50" cy="50" r="44" fill="none" stroke="${colors[type]}" stroke-width="4"
-                            stroke-dasharray="276.46" stroke-dashoffset="276.46"
-                            style="animation:drawCircle 1s ease forwards;"/>
-                    <path d="M30 50 L45 65 L70 35" fill="none" stroke="${colors[type]}" stroke-width="6"
-                          stroke-linecap="round" stroke-linejoin="round"
-                          style="stroke-dasharray:100;stroke-dashoffset:100;animation:draw 0.6s ease forwards 0.5s;"/>
+                    <circle cx="50" cy="50" r="44" fill="none" stroke="${colors[type]}" stroke-width="4" stroke-dasharray="276.46" stroke-dashoffset="276.46" style="animation:drawCircle 1s ease forwards;"/>
+                    <path d="M30 50 L45 65 L70 35" fill="none" stroke="${colors[type]}" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" style="stroke-dasharray:100;stroke-dashoffset:100;animation:draw 0.6s ease forwards 0.5s;"/>
                 </svg>
             </div>
             <p style="font-size:19px;font-weight:700;color:${colors[type]};margin:0 0 8px;">${title}</p>
             ${subtitle ? `<p style="font-size:14px;color:var(--text-light);margin:0 0 24px;line-height:1.5;">${subtitle}</p>` : ''}
-            <button id="fancyAlertOK" style="padding:11px 28px;background:${colors[type]};color:white;
-                border:none;border-radius:12px;font-weight:700;font-size:16px;cursor:pointer;
-                min-width:110px;transition:all 0.2s;" autofocus>
-                OK
-            </button>
+            <button id="fancyAlertOK" style="padding:11px 28px;background:${colors[type]};color:white;border:none;border-radius:12px;font-weight:700;font-size:16px;cursor:pointer;" autofocus>OK</button>
         </div>
     `;
 
     document.body.appendChild(modal);
 
-    const dialog = modal.querySelector('#fancyDialog');
     const okBtn = modal.querySelector('#fancyAlertOK');
 
-    // WICHTIG: Dialog fokussieren → Tastatureingaben werden empfangen
-    dialog.focus();
-
-    const closeModal = (e) => {
-        if (e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
+    // DIE WICHTIGE ZEILE: Arrow-Function OHNE const/let/var → onClose ist garantiert im Scope!
+    okBtn.onclick = () => {
         modal.style.opacity = '0';
-        setTimeout(() => modal.remove(), 350);
+        setTimeout(() => {
+            modal.remove();
+            if (onClose) onClose();   // ← Jetzt wird’s ausgeführt!
+        }, 350);
     };
 
-    // Enter und Escape schließen das Popup
-    dialog.addEventListener('keydown', (e) => {
+    // Enter & Escape
+    modal.addEventListener('keydown', e => {
         if (e.key === 'Enter' || e.key === 'Escape') {
             e.preventDefault();
-            closeModal();
+            okBtn.click();
         }
     });
 
-    okBtn.onclick = closeModal;
-
-    // Falls jemand auf das Overlay klickt → auch schließen
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeModal();
+    // Klick außerhalb
+    modal.addEventListener('click', e => {
+        if (e.target === modal) okBtn.click();
     });
+
+    modal.querySelector('#fancyDialog').focus();
 }
 
 function escapeHtml(text) {
@@ -3501,6 +3689,11 @@ tr:last-child td {
 @keyframes pulse {
     0%, 100% { box-shadow: 0 0 0 2px #e74c3c; }
     50% { box-shadow: 0 0 0 4px #e74c3c, 0 0 12px rgba(231, 76, 60, 0.4); }
+}
+
+@keyframes slideUp {
+    from { transform: translateY(100px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
 }
 
 /* === TOOLTIPS === */
