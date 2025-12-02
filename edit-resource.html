@@ -54,7 +54,18 @@ font-weight: 600; font-size: 15px; min-width: 110px; transition: all 0.2s;
 .cancel:hover { background: #7f8c8d; }
 </style>
 </head>
-<body>
+<body onload="document.getElementById('topic').blur()">
+
+<script>
+
+window.addEventListener('message', event => {
+    if (event.origin !== location.origin) return;
+    if (event.data?.type === 'EDIT_RESOURCE' || event.data?.type === 'NEW_RESOURCE') {
+        window.receivedData = event.data;
+    }
+});
+</script>
+
 <div class="container">
 <h2 id="pageTitle">Ressource bearbeiten</h2>
 <form id="editForm" autocomplete="off">
@@ -103,168 +114,24 @@ font-weight: 600; font-size: 15px; min-width: 110px; transition: all 0.2s;
 </div>
 
 <script>
-// ===== NEU: postMessage-only – KEIN Query-String mehr! =====
+// ===== FINAL: Alles in einem Listener =====
 let currentEditIndex = -1;
-
-window.addEventListener('message', event => {
-    if (event.origin !== location.origin) return;
-
-    if (event.data.type === 'EDIT_RESOURCE') {
-        currentEditIndex = event.data.index;
-        const r = event.data.data;
-
-        document.getElementById('topic').value = r.topic || '';
-        document.getElementById('subject').value = r.subject || '';
-        document.getElementById('grade').value = r.grade || '';
-        document.getElementById('competence').value = r.competence || '';
-        document.getElementById('level').value = r.level || '';
-        document.getElementById('tool').value = r.tool || '';
-        document.getElementById('description').value = r.description || '';
-        document.getElementById('pageTitle').textContent = 'Ressource bearbeiten';
-        document.getElementById('topic').focus();
-    }
-
-    if (event.data.type === 'NEW_RESOURCE') {
-        currentEditIndex = -1;
-        document.getElementById('pageTitle').textContent = 'Neue Ressource anlegen';
-        document.querySelectorAll('input, select, textarea').forEach(el => {
-            if (el.type !== 'button') el.value = '';
-        });
-        document.getElementById('topic').focus();
-    }
-});
-
-// ===== SPEICHERN – nur noch postMessage =====
-document.getElementById('saveBtn').onclick = () => {
-    const resource = {
-        topic: document.getElementById('topic').value.trim(),
-        subject: document.getElementById('subject').value,
-        grade: document.getElementById('grade').value,
-        competence: document.getElementById('competence').value,
-        level: document.getElementById('level').value,
-        tool: document.getElementById('tool').value.trim(),
-        description: document.getElementById('description').value.trim(),
-        favorite: false,
-        lastModified: new Date().toLocaleDateString('de-DE')
-    };
-
-    if (!resource.topic || !resource.subject || !resource.grade || !resource.competence || !resource.level) {
-        alert('Bitte alle Pflichtfelder (*) ausfüllen!');
-        return;
-    }
-
-    if (window.opener) {
-        // 1. Daten + Animation sofort ans Hauptfenster schicken
-        if (currentEditIndex >= 0) {
-            window.opener.postMessage({ type: 'UPDATE_RESOURCE', index: currentEditIndex, data: resource }, location.origin);
-        } else {
-            window.opener.postMessage({ type: 'ADD_RESOURCE', data: resource }, location.origin);
-        }
-        window.opener.postMessage({ type: 'SHOW_EDIT_SUCCESS' }, location.origin);
-
-        document.body.style.transition = 'opacity 0.25s ease';
-        document.body.style.opacity = '0';
-        setTimeout(() => window.close(), 250);
-    }
-};
-
-document.getElementById('cancelBtn').onclick = () => window.close();
-
-// Enter = Speichern (außer in Textarea mit Shift)
-document.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey && document.activeElement.tagName !== 'TEXTAREA') {
-        e.preventDefault();
-        document.getElementById('saveBtn').click();
-    }
-    if (e.key === 'Escape') window.close();
-});
-
-// Klassen 1–13
-for (let i = 1; i <= 13; i++) {
-    const opt = new Option(`Klasse ${i}`, `Klasse ${i}`);
-    document.getElementById('grade').add(opt);
-}
-
-// Dark Mode übernehmen
-if (window.opener?.document.body.classList.contains('dark')) {
-    document.body.classList.add('dark');
-}
-
-// Autocomplete (bleibt unverändert – super!)
-function setupAutocomplete(inputId, dropdownId, getSuggestions) {
-    const input = document.getElementById(inputId);
-    const dropdown = document.getElementById(dropdownId);
-    input.addEventListener('input', () => {
-        const value = input.value.toLowerCase();
-        dropdown.innerHTML = '';
-        if (!value) return dropdown.style.display = 'none';
-
-        const suggestions = getSuggestions().filter(s => s.toLowerCase().includes(value));
-        if (!suggestions.length) return dropdown.style.display = 'none';
-
-        suggestions.forEach(s => {
-            const div = document.createElement('div');
-            div.className = 'autocomplete-item';
-            div.textContent = s;
-            div.onclick = () => { input.value = s; dropdown.style.display = 'none'; };
-            dropdown.appendChild(div);
-        });
-        dropdown.style.display = 'block';
-    });
-
-    input.addEventListener('keydown', e => {
-        const items = dropdown.querySelectorAll('.autocomplete-item');
-        let highlighted = dropdown.querySelector('.highlighted');
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            if (!highlighted) items[0]?.classList.add('highlighted');
-            else {
-                highlighted.classList.remove('highlighted');
-                const next = highlighted.nextElementSibling || items[0];
-                next?.classList.add('highlighted');
-            }
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            if (highlighted) {
-                highlighted.classList.remove('highlighted');
-                const prev = highlighted.previousElementSibling || items[items.length - 1];
-                prev?.classList.add('highlighted');
-            }
-        } else if (e.key === 'Enter' && highlighted) {
-            e.preventDefault();
-            input.value = highlighted.textContent;
-            dropdown.style.display = 'none';
-        } else if (e.key === 'Escape') dropdown.style.display = 'none';
-    });
-
-    document.addEventListener('click', e => {
-        if (!input.contains(e.target) && !dropdown.contains(e.target)) {
-            dropdown.style.display = 'none';
-        }
-    });
-}
-
-// ===== AUTOCOMPLETE – JETZT OHNE localStorage! =====
 let allTopics = [];
 let allTools = [];
 
-// Empfange Daten + Vorschläge vom Hauptfenster
 window.addEventListener('message', event => {
     if (event.origin !== location.origin) return;
 
     if (event.data.type === 'EDIT_RESOURCE' || event.data.type === 'NEW_RESOURCE') {
-        // Vorschläge übernehmen
         allTopics = event.data.allTopics || [];
         allTools  = event.data.allTools  || [];
 
-        // Nur jetzt Autocomplete aktivieren – wenn Daten da sind!
         if (!window.autocompleteInitialized) {
             setupAutocomplete('topic', 'topicDropdown', () => allTopics);
             setupAutocomplete('tool',  'toolDropdown',  () => allTools);
             window.autocompleteInitialized = true;
         }
 
-        // Ressource laden (wie vorher)
         if (event.data.type === 'EDIT_RESOURCE') {
             currentEditIndex = event.data.index;
             const r = event.data.data;
@@ -287,7 +154,74 @@ window.addEventListener('message', event => {
     }
 });
 
-// Autocomplete-Funktion (unverändert – nur später aufgerufen!)
+// Falls die Nachricht VOR DOMContentLoaded kam → jetzt verarbeiten
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.receivedData) {
+        const event = new MessageEvent('message', {
+            data: window.receivedData,
+            origin: location.origin
+        });
+        window.dispatchEvent(event);
+        delete window.receivedData;
+    }
+
+    // Klassen 1–13 füllen
+    for (let i = 1; i <= 13; i++) {
+        const opt = new Option(`Klasse ${i}`, `Klasse ${i}`);
+        document.getElementById('grade').add(opt);
+    }
+
+    // Dark Mode übernehmen
+    if (window.opener?.document.body.classList.contains('dark')) {
+        document.body.classList.add('dark');
+    }
+});
+
+// ===== SPEICHERN =====
+document.getElementById('saveBtn').onclick = () => {
+    const resource = {
+        topic: document.getElementById('topic').value.trim(),
+        subject: document.getElementById('subject').value,
+        grade: document.getElementById('grade').value,
+        competence: document.getElementById('competence').value,
+        level: document.getElementById('level').value,
+        tool: document.getElementById('tool').value.trim(),
+        description: document.getElementById('description').value.trim(),
+        favorite: false,
+        lastModified: new Date().toLocaleDateString('de-DE')
+    };
+
+    if (!resource.topic || !resource.subject || !resource.grade || !resource.competence || !resource.level) {
+        alert('Bitte alle Pflichtfelder (*) ausfüllen!');
+        return;
+    }
+
+    if (window.opener && !window.opener.closed) {
+        if (currentEditIndex >= 0) {
+            window.opener.postMessage({ type: 'UPDATE_RESOURCE', index: currentEditIndex, data: resource }, location.origin);
+        } else {
+            window.opener.postMessage({ type: 'ADD_RESOURCE', data: resource }, location.origin);
+        }
+        window.opener.postMessage({ type: 'SHOW_EDIT_SUCCESS' }, location.origin);
+    }
+
+    document.body.style.transition = 'opacity 0.25s ease';
+    document.body.style.opacity = '0';
+    setTimeout(() => window.close(), 250);
+};
+
+document.getElementById('cancelBtn').onclick = () => window.close();
+
+// Enter = Speichern
+document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey && document.activeElement.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        document.getElementById('saveBtn').click();
+    }
+    if (e.key === 'Escape') window.close();
+});
+
+// ===== AUTOCOMPLETE (unverändert) =====
 function setupAutocomplete(inputId, dropdownId, getSuggestions) {
     const input = document.getElementById(inputId);
     const dropdown = document.getElementById(dropdownId);
@@ -310,7 +244,6 @@ function setupAutocomplete(inputId, dropdownId, getSuggestions) {
         dropdown.style.display = 'block';
     });
 
-    // Pfeiltasten, Enter, Escape (wie bei dir)
     input.addEventListener('keydown', e => {
         const items = dropdown.querySelectorAll('.autocomplete-item');
         let highlighted = dropdown.querySelector('.highlighted');
@@ -342,3 +275,6 @@ function setupAutocomplete(inputId, dropdownId, getSuggestions) {
         }
     });
 }
+</script>
+</body>
+</html>
