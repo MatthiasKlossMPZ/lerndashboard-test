@@ -690,6 +690,34 @@ dialog#confirmDeleteDialog button[value="delete"]:hover {
     </style>
 </head>
 <body>
+    <script>
+        window.resources = [];
+        window.undoStack = [];
+        window.dataReady = false;
+
+        const loadData = () => new Promise(resolve => {
+            const go = window.requestIdleCallback || (cb => setTimeout(cb, 50));
+            go(() => {
+                try {
+                    const r = localStorage.getItem('resources');
+                    const u = localStorage.getItem('undoStack');
+                    window.resources = r ? JSON.parse(r) : [];
+                    window.undoStack = u ? JSON.parse(u) : [];
+                } catch (e) {
+                    console.warn('Fehler beim Laden der Daten', e);
+                }
+                window.dataReady = true;
+                resolve();
+            });
+        });
+
+        // Sofort starten
+        loadData().then(() => {
+            // Jetzt darfst du applyFilters() etc. aufrufen
+            console.log('Daten geladen – App kann starten');
+        });
+    </script>
+
 <!-- DRUCK-FOOTER: Schulname (unsichtbar) -->
 <div id="printSchoolName" style="position: fixed; bottom: 0; left: 0; font-size: 9pt; color: #666; display: none;">
     Schule: <span id="printSchoolNameText"></span>
@@ -945,7 +973,7 @@ dialog#confirmDeleteDialog button[value="delete"]:hover {
 
 <script>
 
-// === GLOBALE FILTER-VARIABLEN (einmalig!) ===
+// === GLOBALE FILTER-VARIABLEN ===
 let currentFilters = {
     subject: '',
     grade: '',
@@ -962,7 +990,7 @@ function updateCurrentFilters() {
     currentFilters.tool = document.getElementById('filterTool')?.value?.trim().toLowerCase() || '';
 }
 
-// === GLOBALE VARIABLEN (EINZIGER ORT!) ===
+// === GLOBALE VARIABLEN ===
 const VERSION = '1.1.35';
 const REPO_PATH = (() => {
   if (location.hostname === 'localhost' || 
@@ -971,12 +999,10 @@ const REPO_PATH = (() => {
     return '/';
   }
   const path = location.pathname.split('/').filter(Boolean);
-  return location.origin + '/' + (path[0] || '') + '/';  // ← Immer mit trailing '/'
+  return location.origin + '/' + (path[0] || '') + '/'; 
 })();
-console.log('Frontend REPO_PATH:', REPO_PATH);  // Debug: Sollte /lerndashboard/ sein
+console.log('Frontend REPO_PATH:', REPO_PATH); 
 
-let resources = JSON.parse(localStorage.getItem('resources') || '[]');
-let undoStack = JSON.parse(localStorage.getItem('undoStack') || '[]'); // neu!
 let tools = new Set(resources.map(r => r.tool?.trim().toLowerCase()).filter(Boolean));
 let dropdownsInitialized = false;
 
@@ -1852,18 +1878,58 @@ window.addEventListener('beforeinstallprompt', (e) => {
   }
 });
 
-// === INIT ===
-['filterSubject','filterGrade','filterTool','filterCompetence','filterLevel','filterFavorite'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('change', applyFilters);
-});
-const searchEl = document.getElementById('searchTopic');
-if (searchEl) searchEl.addEventListener('input', applyFilters);
+// ===========================
+// NEU: ASYNCHRONES DATENLADEN 
+// ===========================
 
-populateDropdowns();
-applyFilters();
-applyFilters();
-document.getElementById('matrixPdfBtn')?.addEventListener('click', exportMatrixPDF);
+window.resources   = [];
+window.undoStack   = [];
+window.dataReady   = false;
+
+function loadData() {
+    return new Promise(resolve => {
+        const idle = window.requestIdleCallback || (cb => setTimeout(cb, 50));
+        idle(() => {
+            try {
+                const r = localStorage.getItem('resources');
+                const u = localStorage.getItem('undoStack');
+                window.resources = r ? JSON.parse(r) : [];
+                window.undoStack = u ? JSON.parse(u) : [];
+            } catch (e) {
+                console.warn('Daten konnten nicht geladen werden', e);
+                window.resources = [];
+                window.undoStack = [];
+            }
+            window.dataReady = true;
+            resolve();
+        });
+    });
+}
+
+function startApp() {
+    if (!window.dataReady) return; // Sicherheit
+
+    ['filterSubject','filterGrade','filterTool','filterCompetence','filterLevel','filterFavorite'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', applyFilters);
+    });
+
+    const searchEl = document.getElementById('searchTopic');
+    if (searchEl) searchEl.addEventListener('input', applyFilters);
+
+    populateDropdowns();
+    applyFilters();
+
+    document.getElementById('matrixPdfBtn')?.addEventListener('click', exportMatrixPDF);
+
+    console.log('LernDashboard vollständig gestartet – alles butterweich!');
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => loadData().then(startApp));
+} else {
+    loadData().then(startApp);
+}
 
 function exportTemplate() {
     const template = [
