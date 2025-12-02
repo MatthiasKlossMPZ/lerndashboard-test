@@ -244,12 +244,41 @@ function setupAutocomplete(inputId, dropdownId, getSuggestions) {
     });
 }
 
-function getAllTopics() {
-    return [...new Set(JSON.parse(localStorage.getItem('resources') || '[]').map(r => r.topic).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
-}
-function getAllTools() {
-    return [...new Set(JSON.parse(localStorage.getItem('resources') || '[]').map(r => r.tool).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de'));
-}
+// ===== Autocomplete über das Hauptfenster =====
+let allTopics = [];
+let allTools = [];
+
+window.addEventListener('message', event => {
+    if (event.origin !== location.origin) return;
+
+    if (event.data.type === 'EDIT_RESOURCE' || event.data.type === 'NEW_RESOURCE') {
+        allTopics = event.data.allTopics || [];
+        allTools = event.data.allTools || [];
+
+        if (event.data.type === 'EDIT_RESOURCE') {
+            currentEditIndex = event.data.index;
+            const r = event.data.data;
+            document.getElementById('topic').value = r.topic || '';
+            document.getElementById('subject').value = r.subject || '';
+            document.getElementById('grade').value = r.grade || '';
+            document.getElementById('competence').value = r.competence || '';
+            document.getElementById('level').value = r.level || '';
+            document.getElementById('tool').value = r.tool || '';
+            document.getElementById('description').value = r.description || '';
+            document.getElementById('pageTitle').textContent = 'Ressource bearbeiten';
+        } else {
+            currentEditIndex = -1;
+            document.getElementById('pageTitle').textContent = 'Neue Ressource anlegen';
+            document.querySelectorAll('input, select, textarea').forEach(el => {
+                if (el.type !== 'button') el.value = '';
+            });
+        }
+        document.getElementById('topic').focus();
+    }
+});
+
+function getAllTopics() { return allTopics; }
+function getAllTools() { return allTools; }
 
 setupAutocomplete('topic', 'topicDropdown', getAllTopics);
 setupAutocomplete('tool', 'toolDropdown', getAllTools);
