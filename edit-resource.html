@@ -244,17 +244,27 @@ function setupAutocomplete(inputId, dropdownId, getSuggestions) {
     });
 }
 
-// ===== Autocomplete über das Hauptfenster =====
+// ===== AUTOCOMPLETE – JETZT OHNE localStorage! =====
 let allTopics = [];
 let allTools = [];
 
+// Empfange Daten + Vorschläge vom Hauptfenster
 window.addEventListener('message', event => {
     if (event.origin !== location.origin) return;
 
     if (event.data.type === 'EDIT_RESOURCE' || event.data.type === 'NEW_RESOURCE') {
+        // Vorschläge übernehmen
         allTopics = event.data.allTopics || [];
-        allTools = event.data.allTools || [];
+        allTools  = event.data.allTools  || [];
 
+        // Nur jetzt Autocomplete aktivieren – wenn Daten da sind!
+        if (!window.autocompleteInitialized) {
+            setupAutocomplete('topic', 'topicDropdown', () => allTopics);
+            setupAutocomplete('tool',  'toolDropdown',  () => allTools);
+            window.autocompleteInitialized = true;
+        }
+
+        // Ressource laden (wie vorher)
         if (event.data.type === 'EDIT_RESOURCE') {
             currentEditIndex = event.data.index;
             const r = event.data.data;
@@ -277,11 +287,58 @@ window.addEventListener('message', event => {
     }
 });
 
-function getAllTopics() { return allTopics; }
-function getAllTools() { return allTools; }
+// Autocomplete-Funktion (unverändert – nur später aufgerufen!)
+function setupAutocomplete(inputId, dropdownId, getSuggestions) {
+    const input = document.getElementById(inputId);
+    const dropdown = document.getElementById(dropdownId);
 
-setupAutocomplete('topic', 'topicDropdown', getAllTopics);
-setupAutocomplete('tool', 'toolDropdown', getAllTools);
-</script>
-</body>
-</html>
+    input.addEventListener('input', () => {
+        const value = input.value.toLowerCase();
+        dropdown.innerHTML = '';
+        if (!value) return dropdown.style.display = 'none';
+
+        const suggestions = getSuggestions().filter(s => s.toLowerCase().includes(value));
+        if (!suggestions.length) return dropdown.style.display = 'none';
+
+        suggestions.forEach(s => {
+            const div = document.createElement('div');
+            div.className = 'autocomplete-item';
+            div.textContent = s;
+            div.onclick = () => { input.value = s; dropdown.style.display = 'none'; };
+            dropdown.appendChild(div);
+        });
+        dropdown.style.display = 'block';
+    });
+
+    // Pfeiltasten, Enter, Escape (wie bei dir)
+    input.addEventListener('keydown', e => {
+        const items = dropdown.querySelectorAll('.autocomplete-item');
+        let highlighted = dropdown.querySelector('.highlighted');
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (!highlighted) items[0]?.classList.add('highlighted');
+            else {
+                highlighted.classList.remove('highlighted');
+                const next = highlighted.nextElementSibling || items[0];
+                next?.classList.add('highlighted');
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (highlighted) {
+                highlighted.classList.remove('highlighted');
+                const prev = highlighted.previousElementSibling || items[items.length - 1];
+                prev?.classList.add('highlighted');
+            }
+        } else if (e.key === 'Enter' && highlighted) {
+            e.preventDefault();
+            input.value = highlighted.textContent;
+            dropdown.style.display = 'none';
+        } else if (e.key === 'Escape') dropdown.style.display = 'none';
+    });
+
+    document.addEventListener('click', e => {
+        if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+}
